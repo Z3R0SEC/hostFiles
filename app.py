@@ -41,12 +41,12 @@ def create_app(config_class=ActiveConfig):
     sess.init_app(app)
     csrf.init_app(app)
     limiter.init_app(app)
-    socketio.init_app(
-        app,
-        async_mode=app.config["SOCKETIO_ASYNC_MODE"],
-        cors_allowed_origins="*",
-        manage_session=False,
-    )
+    ssocketio.init_app(
+    app,
+    cors_allowed_origins="*",
+    manage_session=False,
+    async_mode="threading"
+)
 
     # ── Database bootstrap ────────────────────────────────
     from utils.db import init_db, seed_super_admin

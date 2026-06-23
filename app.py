@@ -11,7 +11,6 @@ from flask_socketio import SocketIO
 
 from config import ActiveConfig
 
-# ── Extensions (initialised without app) ─────────────────────────────────────
 sess = Session()
 csrf = CSRFProtect()
 limiter = Limiter(key_func=get_remote_address)
@@ -22,7 +21,6 @@ def create_app(config_class=ActiveConfig):
     app = Flask(__name__, instance_relative_config=True)
     app.config.from_object(config_class)
 
-    # ── Ensure required directories exist ────────────────
     for d in [
         app.config["UPLOAD_FOLDER"],
         app.config["USER_SITES_DIR"],
@@ -33,24 +31,22 @@ def create_app(config_class=ActiveConfig):
     ]:
         os.makedirs(d, exist_ok=True)
 
-    # ── Init extensions ───────────────────────────────────
     sess.init_app(app)
     csrf.init_app(app)
     limiter.init_app(app)
     socketio.init_app(
        app,
        cors_allowed_origins="*",
+       allow_unsafe_werkzeug=True,
        manage_session=False,
        async_mode="threading"
     )
 
-    # ── Database bootstrap ────────────────────────────────
     from utils.db import init_db, seed_super_admin
     with app.app_context():
         init_db(app)
         seed_super_admin(app)
 
-    # ── Register blueprints ───────────────────────────────
     from routes.public import public_bp, api_bp
     from routes.auth import auth_bp
     from routes.dashboard import dashboard_bp
@@ -71,14 +67,12 @@ def create_app(config_class=ActiveConfig):
     app.register_blueprint(admin_bp, url_prefix="/admin")
     app.register_blueprint(api_bp, url_prefix="/internal-api")
 
-    # ── Security headers ──────────────────────────────────
     @app.after_request
     def set_security_headers(response):
         for key, val in app.config["SECURITY_HEADERS"].items():
             response.headers[key] = val
         return response
 
-    # ── Maintenance mode ──────────────────────────────────
     @app.before_request
     def check_maintenance():
         from utils.db import get_setting
@@ -92,7 +86,6 @@ def create_app(config_class=ActiveConfig):
             from flask import render_template
             return render_template("errors/maintenance.html"), 503
 
-    # ── Inject current user into templates ────────────────
     @app.context_processor
     def inject_user():
         import datetime
@@ -101,7 +94,6 @@ def create_app(config_class=ActiveConfig):
         if "user_id" in session:
             user = get_user_by_id(session["user_id"])
 
-        # Dynamic base URL — auto-detects host, works on localhost, VPS, Ngrok
         host = request.host       # "localhost:5000" or "example.com"
         scheme = request.scheme   # "http" or "https"
         base_url = f"{scheme}://{host}"
@@ -125,7 +117,6 @@ def create_app(config_class=ActiveConfig):
             "make_site_url": make_site_url,
         }
 
-    # ── Error handlers ────────────────────────────────────
     @app.errorhandler(404)
     def not_found(e):
         from flask import render_template
@@ -148,10 +139,8 @@ def create_app(config_class=ActiveConfig):
         from flask import render_template
         return render_template("errors/429.html"), 429
 
-    # ── SocketIO events ───────────────────────────────────
     from routes import socket_events  # noqa: F401
 
-    # ── Logging ───────────────────────────────────────────
     if not app.debug:
         log_file = os.path.join(app.config["LOGS_DIR"], "platform.log")
         handler = RotatingFileHandler(log_file, maxBytes=10_485_760, backupCount=5)

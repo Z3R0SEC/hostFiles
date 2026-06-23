@@ -1,7 +1,3 @@
-"""
-HostFlow Platform — Application Factory
-"""
-
 import os
 import logging
 from logging.handlers import RotatingFileHandler
@@ -41,12 +37,12 @@ def create_app(config_class=ActiveConfig):
     sess.init_app(app)
     csrf.init_app(app)
     limiter.init_app(app)
-    ssocketio.init_app(
-    app,
-    cors_allowed_origins="*",
-    manage_session=False,
-    async_mode="threading"
-)
+    socketio.init_app(
+       app,
+       cors_allowed_origins="*",
+       manage_session=False,
+       async_mode="threading"
+    )
 
     # ── Database bootstrap ────────────────────────────────
     from utils.db import init_db, seed_super_admin

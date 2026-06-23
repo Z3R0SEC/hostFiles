@@ -1,0 +1,118 @@
+{% extends "admin/admin_layout.html" %}
+{% block title %}Edit User — Admin — {{ platform_name }}{% endblock %}
+
+{% block admin_content %}
+<div class="max-w-3xl mx-auto space-y-6 animate-fade-in">
+  <div>
+    <a href="{{ url_for('admin.users') }}" class="text-zinc-500 hover:text-zinc-300 text-sm flex items-center gap-1 mb-3">
+      <i class="fas fa-arrow-left text-xs"></i> Users
+    </a>
+    <div class="flex items-center gap-4">
+      <div class="w-14 h-14 rounded-2xl bg-brand-500/20 flex items-center justify-center">
+        <span class="text-brand-400 text-2xl font-bold">{{ user.username[0].upper() }}</span>
+      </div>
+      <div>
+        <h1 class="text-2xl font-bold text-white">{{ user.username }}</h1>
+        <p class="text-zinc-400 text-sm">{{ user.email }}</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid lg:grid-cols-2 gap-6">
+    <!-- Edit form -->
+    <div class="card p-6">
+      <h2 class="text-sm font-semibold text-zinc-400 uppercase tracking-widest mb-5">Edit User</h2>
+      <form method="POST" class="space-y-4">
+        {{ form.hidden_tag() }}
+        <div>
+          <label class="block text-xs font-semibold text-zinc-500 mb-1.5 uppercase">Role</label>
+          {{ form.role(class="input-field") }}
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-zinc-500 mb-1.5 uppercase">Storage Limit (MB)</label>
+          {{ form.storage_limit_mb(class="input-field", value=user.storage_limit_mb) }}
+        </div>
+        <div class="flex flex-wrap gap-4 pt-2">
+          <label class="flex items-center gap-2 cursor-pointer">
+            {{ form.is_verified(class="w-4 h-4 accent-brand-500") }}
+            <span class="text-sm text-zinc-300">Verified</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer">
+            {{ form.is_suspended(class="w-4 h-4 accent-yellow-500") }}
+            <span class="text-sm text-zinc-300">Suspended</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer">
+            {{ form.is_banned(class="w-4 h-4 accent-red-500") }}
+            <span class="text-sm text-zinc-300">Banned</span>
+          </label>
+        </div>
+        <button type="submit" class="btn btn-primary w-full justify-center">
+          <i class="fas fa-save"></i> Save Changes
+        </button>
+      </form>
+
+      <div class="border-t border-white/[0.06] mt-5 pt-5">
+        <form method="POST" action="{{ url_for('admin.reset_user_password', user_id=user.id) }}"
+              onsubmit="return confirm('Send a temporary password to {{ user.email }}?')">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+          <button type="submit" class="btn btn-secondary w-full justify-center text-sm">
+            <i class="fas fa-key"></i> Reset Password
+          </button>
+        </form>
+        {% if current_user.role == 'super_admin' and user.role != 'super_admin' %}
+        <div class="grid grid-cols-2 gap-2 mt-2">
+          <a href="{{ url_for('admin.impersonate', user_id=user.id) }}"
+             onclick="return confirm('Login as this user for troubleshooting?')"
+             class="btn btn-secondary text-sm justify-center">
+            <i class="fas fa-user-secret"></i> Impersonate
+          </a>
+          <form method="POST" action="{{ url_for('admin.delete_user', user_id=user.id) }}"
+                onsubmit="return confirm('Permanently delete this user?')">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <button type="submit" class="btn btn-danger w-full justify-center text-sm">
+              <i class="fas fa-trash"></i> Delete
+            </button>
+          </form>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- User info -->
+    <div class="space-y-4">
+      <div class="card p-5">
+        <h2 class="text-xs font-semibold text-zinc-500 uppercase tracking-widest mb-4">Account Details</h2>
+        <div class="space-y-3">
+          {% set info = [
+            ('User ID', user.id | string),
+            ('Created', user.created_at[:10]),
+            ('Last Login', user.last_login[:10] if user.last_login else '—'),
+            ('Last IP', user.last_ip or '—'),
+            ('Site', site.name if site else 'None'),
+          ] %}
+          {% for label, val in info %}
+          <div class="flex items-center justify-between">
+            <span class="text-xs text-zinc-600">{{ label }}</span>
+            <span class="text-xs text-zinc-300 font-mono">{{ val }}</span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="card p-5">
+        <h2 class="text-xs font-semibold text-zinc-500 uppercase tracking-widest mb-3">Recent Activity</h2>
+        <div class="space-y-2 max-h-52 overflow-y-auto">
+          {% for act in activity %}
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-xs text-zinc-400 truncate">{{ act.action.replace('_',' ').title() }}</span>
+            <span class="text-xs text-zinc-600 flex-shrink-0">{{ act.created_at[5:16] }}</span>
+          </div>
+          {% else %}
+          <p class="text-xs text-zinc-600 text-center py-4">No activity.</p>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

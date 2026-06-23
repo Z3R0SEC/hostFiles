@@ -1,0 +1,329 @@
+{% extends "partials/dash_layout.html" %}
+{% block title %}SQL Manager — {{ site.name }} — {{ platform_name }}{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto space-y-5 animate-fade-in">
+
+  <!-- Header -->
+  <div class="flex items-center justify-between flex-wrap gap-3">
+    <div>
+      <a href="{{ url_for('databases.info', site_id=site.id) }}"
+         class="text-zinc-600 hover:text-zinc-400 text-xs flex items-center gap-1.5 mb-3 transition-colors">
+        <i class="fas fa-arrow-left text-[10px]"></i> Database Credentials
+      </a>
+      <h1 class="text-xl font-bold text-white flex items-center gap-2">
+        <i class="fas fa-terminal text-brand-400 text-base"></i>
+        SQL Manager
+      </h1>
+      <p class="text-zinc-500 text-sm mt-0.5">
+        <span class="text-zinc-400 font-mono">{{ db_info.db_name | truncate(40, True, '…') }}</span>
+        &nbsp;·&nbsp;
+        {% if db_info.db_host == 'sqlite_local' %}
+          <span class="text-blue-400">SQLite</span>
+        {% else %}
+          <span class="text-green-400">MariaDB / MySQL</span>
+        {% endif %}
+      </p>
+    </div>
+    <!-- Import SQL file -->
+    <form method="POST" action="{{ url_for('databases.import_sql', site_id=site.id) }}"
+          enctype="multipart/form-data" class="flex items-center gap-2">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+      <label class="btn btn-secondary text-xs cursor-pointer">
+        <i class="fas fa-file-import text-xs"></i>
+        Import .sql
+        <input type="file" name="sql_file" accept=".sql" class="hidden"
+               onchange="this.closest('form').submit()"/>
+      </label>
+    </form>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-4 gap-4">
+
+    <!-- ── Left: Table list ─────────────────────────── -->
+    <div class="lg:col-span-1">
+      <div class="card p-3">
+        <p class="text-[10px] font-semibold text-zinc-600 uppercase tracking-widest mb-2 px-1">Tables</p>
+        {% if tables %}
+          <div class="space-y-0.5">
+            {% for t in tables %}
+            <a href="{{ url_for('databases.browse_table', site_id=site.id, table_name=t) }}"
+               class="flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-mono transition-colors
+               {% if browse_table is defined and browse_table == t %}
+                 bg-brand-600/15 text-brand-300 border border-brand-600/20
+               {% else %}
+                 text-zinc-400 hover:bg-white/5 hover:text-zinc-200
+               {% endif %}">
+              <i class="fas fa-table text-[9px] opacity-60"></i>
+              {{ t }}
+            </a>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="text-zinc-600 text-xs px-1 py-2 italic">No tables yet.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- ── Right: Editor + Results ──────────────────── -->
+    <div class="lg:col-span-3 space-y-4">
+
+      <!-- SQL Editor -->
+      <div class="card p-4">
+        <p class="text-[10px] font-semibold text-zinc-600 uppercase tracking-widest mb-3">SQL Query</p>
+        <form method="POST" action="{{ url_for('databases.run_query', site_id=site.id) }}" id="sql-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+          <div class="relative">
+            <textarea
+              name="sql"
+              id="sql-editor"
+              rows="7"
+              placeholder="SELECT * FROM your_table LIMIT 50;"
+              spellcheck="false"
+              class="w-full rounded-xl bg-black/30 border border-white/8 text-zinc-200 font-mono text-xs leading-relaxed
+                     px-4 py-3 resize-y focus:outline-none focus:border-brand-600/50 focus:ring-1 focus:ring-brand-600/30
+                     placeholder-zinc-700 transition-colors"
+            >{{ last_sql }}</textarea>
+          </div>
+          <div class="flex items-center justify-between mt-3 flex-wrap gap-2">
+            <p class="text-zinc-700 text-xs">
+              <kbd class="px-1.5 py-0.5 rounded bg-white/5 text-zinc-500 text-[10px]">Ctrl+Enter</kbd>
+              to run
+            </p>
+            <div class="flex items-center gap-2">
+              <button type="button" onclick="document.getElementById('sql-editor').value=''"
+                      class="btn btn-ghost text-xs">
+                <i class="fas fa-eraser text-xs"></i> Clear
+              </button>
+              <button type="submit" class="btn btn-primary text-xs">
+                <i class="fas fa-play text-xs"></i> Run Query
+              </button>
+            </div>
+          </div>
+        </form>
+
+        <!-- Quick templates -->
+        <div class="mt-4 pt-4 border-t border-white/5">
+          <p class="text-[10px] text-zinc-700 mb-2 uppercase tracking-widest">Quick Templates</p>
+          <div class="flex flex-wrap gap-1.5">
+            {% set templates = [
+              ("Show tables",    "SHOW TABLES;" if db_info.db_host != 'sqlite_local' else "SELECT name FROM sqlite_master WHERE type='table';"),
+              ("Create table",   "CREATE TABLE example (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  name VARCHAR(255) NOT NULL,\n  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);" if db_info.db_host != 'sqlite_local' else "CREATE TABLE example (\n  id INTEGER PRIMARY KEY AUTOINCREMENT,\n  name TEXT NOT NULL,\n  created_at TEXT DEFAULT (datetime('now'))\n);"),
+              ("Describe table", "DESCRIBE table_name;" if db_info.db_host != 'sqlite_local' else "PRAGMA table_info(table_name);"),
+              ("Select all",     "SELECT * FROM table_name LIMIT 50;"),
+              ("Drop table",     "DROP TABLE IF EXISTS table_name;"),
+            ] %}
+            {% for label, tpl in templates %}
+            <button type="button"
+                    onclick="document.getElementById('sql-editor').value = {{ tpl | tojson }}; document.getElementById('sql-editor').focus()"
+                    class="px-2.5 py-1 rounded-lg bg-white/4 hover:bg-white/8 text-zinc-500 hover:text-zinc-300 text-[11px] transition-colors border border-white/5">
+              {{ label }}
+            </button>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+
+      <!-- Error -->
+      {% if query_error %}
+      <div class="flex items-start gap-3 px-4 py-3 rounded-xl border border-red-500/20 bg-red-500/5">
+        <i class="fas fa-circle-xmark text-red-400 mt-0.5 flex-shrink-0"></i>
+        <div>
+          <p class="text-sm font-semibold text-red-300">Query Error</p>
+          <p class="text-xs font-mono text-red-400/80 mt-1 leading-relaxed">{{ query_error }}</p>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- ── Query Results ──────────────────────────── -->
+      {% if query_result %}
+        {% if query_result.statement_type == "SELECT" %}
+          <div class="card overflow-hidden">
+            <div class="flex items-center justify-between px-4 py-3 border-b border-white/5">
+              <p class="text-xs font-semibold text-zinc-400">
+                <i class="fas fa-table text-brand-400 mr-1.5"></i>
+                Result &mdash; {{ query_result.rowcount }} row{{ 's' if query_result.rowcount != 1 }}
+              </p>
+              <button onclick="copyTableCSV()" class="text-xs text-zinc-600 hover:text-zinc-300 transition-colors">
+                <i class="fas fa-copy text-[10px] mr-1"></i> Copy CSV
+              </button>
+            </div>
+            {% if query_result.columns %}
+            <div class="overflow-x-auto">
+              <table class="w-full text-xs" id="result-table">
+                <thead>
+                  <tr class="border-b border-white/5">
+                    {% for col in query_result.columns %}
+                    <th class="px-3 py-2.5 text-left text-[10px] font-semibold text-zinc-600 uppercase tracking-wide whitespace-nowrap">
+                      {{ col }}
+                    </th>
+                    {% endfor %}
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-white/3">
+                  {% for row in query_result.rows %}
+                  <tr class="hover:bg-white/2 transition-colors">
+                    {% for cell in row %}
+                    <td class="px-3 py-2 font-mono text-zinc-300 max-w-[200px] truncate"
+                        title="{{ cell | string }}">
+                      {% if cell is none %}
+                        <span class="text-zinc-700 italic">NULL</span>
+                      {% else %}
+                        {{ cell | string | truncate(80) }}
+                      {% endif %}
+                    </td>
+                    {% endfor %}
+                  </tr>
+                  {% endfor %}
+                  {% if not query_result.rows %}
+                  <tr>
+                    <td colspan="{{ query_result.columns | length }}"
+                        class="px-3 py-6 text-center text-zinc-600 italic text-xs">
+                      No rows returned.
+                    </td>
+                  </tr>
+                  {% endif %}
+                </tbody>
+              </table>
+            </div>
+            {% else %}
+              <p class="px-4 py-4 text-zinc-600 text-xs italic">No columns in result.</p>
+            {% endif %}
+          </div>
+        {% else %}
+          <div class="flex items-center gap-3 px-4 py-3 rounded-xl border border-green-500/15 bg-green-500/5">
+            <i class="fas fa-circle-check text-green-400 flex-shrink-0"></i>
+            <div>
+              <p class="text-sm font-semibold text-green-300">Query executed successfully.</p>
+              {% if query_result.rowcount >= 0 %}
+              <p class="text-xs text-zinc-500 mt-0.5">{{ query_result.rowcount }} row(s) affected.</p>
+              {% endif %}
+            </div>
+          </div>
+        {% endif %}
+      {% endif %}
+
+      <!-- ── Browse Table Results ───────────────────── -->
+      {% if browse_table is defined and browse_table %}
+        {% if browse_error %}
+        <div class="flex items-start gap-3 px-4 py-3 rounded-xl border border-red-500/20 bg-red-500/5">
+          <i class="fas fa-circle-xmark text-red-400 mt-0.5 flex-shrink-0"></i>
+          <p class="text-xs text-red-400">{{ browse_error }}</p>
+        </div>
+        {% else %}
+        <div class="card overflow-hidden">
+          <div class="flex items-center justify-between px-4 py-3 border-b border-white/5 flex-wrap gap-2">
+            <p class="text-xs font-semibold text-zinc-300">
+              <i class="fas fa-table text-brand-400 mr-1.5"></i>
+              <span class="font-mono text-brand-300">{{ browse_table }}</span>
+              &mdash; {{ browse_total }} total row{{ 's' if browse_total != 1 }}
+            </p>
+            <button onclick="setQuickSQL('SELECT * FROM `{{ browse_table }}` LIMIT 50;')"
+                    class="text-xs text-zinc-600 hover:text-brand-400 transition-colors">
+              <i class="fas fa-code text-[10px] mr-1"></i> Edit in SQL
+            </button>
+          </div>
+          {% if browse_columns %}
+          <div class="overflow-x-auto">
+            <table class="w-full text-xs" id="result-table">
+              <thead>
+                <tr class="border-b border-white/5">
+                  {% for col in browse_columns %}
+                  <th class="px-3 py-2.5 text-left text-[10px] font-semibold text-zinc-600 uppercase tracking-wide whitespace-nowrap">
+                    {{ col }}
+                  </th>
+                  {% endfor %}
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-white/3">
+                {% for row in browse_rows %}
+                <tr class="hover:bg-white/2 transition-colors">
+                  {% for cell in row %}
+                  <td class="px-3 py-2 font-mono text-zinc-300 max-w-[200px] truncate"
+                      title="{{ cell | string }}">
+                    {% if cell is none %}
+                      <span class="text-zinc-700 italic">NULL</span>
+                    {% else %}
+                      {{ cell | string | truncate(80) }}
+                    {% endif %}
+                  </td>
+                  {% endfor %}
+                </tr>
+                {% endfor %}
+                {% if not browse_rows %}
+                <tr>
+                  <td colspan="{{ browse_columns | length }}"
+                      class="px-3 py-6 text-center text-zinc-600 italic text-xs">
+                    No rows in this table.
+                  </td>
+                </tr>
+                {% endif %}
+              </tbody>
+            </table>
+          </div>
+          <!-- Pagination -->
+          {% if browse_total > browse_limit %}
+          <div class="flex items-center justify-between px-4 py-3 border-t border-white/5">
+            <p class="text-xs text-zinc-600">
+              Showing {{ ((browse_page - 1) * browse_limit) + 1 }}–{{ [browse_page * browse_limit, browse_total] | min }}
+              of {{ browse_total }}
+            </p>
+            <div class="flex items-center gap-2">
+              {% if browse_page > 1 %}
+              <a href="{{ url_for('databases.browse_table', site_id=site.id, table_name=browse_table, page=browse_page-1) }}"
+                 class="btn btn-ghost text-xs py-1 px-2.5">
+                <i class="fas fa-chevron-left text-[10px]"></i> Prev
+              </a>
+              {% endif %}
+              {% if browse_page * browse_limit < browse_total %}
+              <a href="{{ url_for('databases.browse_table', site_id=site.id, table_name=browse_table, page=browse_page+1) }}"
+                 class="btn btn-ghost text-xs py-1 px-2.5">
+                Next <i class="fas fa-chevron-right text-[10px]"></i>
+              </a>
+              {% endif %}
+            </div>
+          </div>
+          {% endif %}
+          {% else %}
+            <p class="px-4 py-4 text-zinc-600 text-xs italic">Table is empty.</p>
+          {% endif %}
+        </div>
+        {% endif %}
+      {% endif %}
+
+    </div>
+  </div>
+
+</div>
+
+{% block scripts %}
+<script>
+// Ctrl+Enter to run query
+document.getElementById('sql-editor').addEventListener('keydown', function(e) {
+  if (e.ctrlKey && e.key === 'Enter') {
+    e.preventDefault();
+    document.getElementById('sql-form').submit();
+  }
+});
+
+function setQuickSQL(sql) {
+  document.getElementById('sql-editor').value = sql;
+  document.getElementById('sql-editor').scrollIntoView({ behavior: 'smooth' });
+  document.getElementById('sql-editor').focus();
+}
+
+function copyTableCSV() {
+  const table = document.getElementById('result-table');
+  if (!table) return;
+  const rows = [...table.querySelectorAll('tr')].map(r =>
+    [...r.querySelectorAll('th, td')].map(c => '"' + c.innerText.replace(/"/g, '""') + '"').join(',')
+  );
+  navigator.clipboard.writeText(rows.join('\n')).then(() => {
+    window.dispatchEvent(new CustomEvent('toast', {
+      detail: { message: 'Copied as CSV!', icon: 'fas fa-check text-green-400' }
+    }));
+  });
+}
+</script>
+{% endblock %}
+{% endblock %}

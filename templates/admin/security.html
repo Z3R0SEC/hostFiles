@@ -1,0 +1,53 @@
+{% extends "admin/admin_layout.html" %}
+{% block title %}Security — Admin — {{ platform_name }}{% endblock %}
+{% block admin_content %}
+<div class="max-w-4xl mx-auto space-y-6 animate-fade-in">
+  <h1 class="text-2xl font-bold text-white">Security</h1>
+
+  <div class="grid lg:grid-cols-2 gap-6">
+    <div class="card">
+      <div class="px-5 py-4 border-b border-white/[0.06]">
+        <h2 class="text-sm font-semibold text-zinc-400 uppercase tracking-widest">Recent Logins</h2>
+      </div>
+      <div class="divide-y divide-white/[0.04] max-h-96 overflow-y-auto">
+        {% for login in recent_logins %}
+        <div class="px-5 py-3 flex items-center gap-3">
+          <div class="w-7 h-7 rounded-lg bg-green-500/10 flex items-center justify-center flex-shrink-0">
+            <i class="fas fa-sign-in-alt text-green-400 text-xs"></i>
+          </div>
+          <div class="flex-1 min-w-0">
+            <p class="text-xs text-zinc-300 truncate">{{ login.email }}</p>
+            <p class="text-xs text-zinc-600 font-mono">{{ login.ip_address or '—' }}</p>
+          </div>
+          <span class="text-xs text-zinc-600">{{ login.created_at[5:16] }}</span>
+        </div>
+        {% else %}
+        <div class="px-5 py-8 text-center text-zinc-600 text-sm">No logins recorded.</div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="px-5 py-4 border-b border-white/[0.06]">
+        <h2 class="text-sm font-semibold text-zinc-400 uppercase tracking-widest">Banned Users</h2>
+      </div>
+      <div class="divide-y divide-white/[0.04] max-h-96 overflow-y-auto">
+        {% for u in banned_users %}
+        <div class="px-5 py-3 flex items-center gap-3">
+          <div class="w-7 h-7 rounded-full bg-red-500/20 flex items-center justify-center flex-shrink-0">
+            <span class="text-red-400 text-xs font-bold">{{ u.username[0].upper() }}</span>
+          </div>
+          <div class="flex-1 min-w-0">
+            <p class="text-xs text-zinc-300 truncate">{{ u.username }}</p>
+            <p class="text-xs text-zinc-600 truncate">{{ u.email }}</p>
+          </div>
+          <a href="{{ url_for('admin.edit_user', user_id=u.id) }}" class="text-xs text-brand-400 hover:text-brand-300">Edit</a>
+        </div>
+        {% else %}
+        <div class="px-5 py-8 text-center text-zinc-600 text-sm">No banned users.</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

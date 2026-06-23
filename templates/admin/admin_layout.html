@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block body %}
+
+<div class="flex h-screen overflow-hidden">
+
+  <!-- Admin sidebar -->
+  <aside class="hidden lg:flex flex-col w-52 flex-shrink-0" style="background:#0a0a0b; border-right:1px solid rgba(255,255,255,0.07)">
+    <div class="flex items-center gap-2.5 px-4 py-4" style="border-bottom:1px solid rgba(255,255,255,0.07)">
+      <div class="w-7 h-7 rounded-lg bg-red-500/15 border border-red-500/25 flex items-center justify-center">
+        <i class="fas fa-shield-halved text-red-400 text-xs"></i>
+      </div>
+      <span class="font-bold text-white text-sm">Admin</span>
+    </div>
+
+    <nav class="flex-1 px-2 py-3 overflow-y-auto space-y-0.5 text-xs">
+      <a href="{{ url_for('admin.dashboard') }}" class="nav-link {{ 'active' if request.endpoint == 'admin.dashboard' }}">
+        <i class="fas fa-chart-bar icon"></i> Dashboard
+      </a>
+      <a href="{{ url_for('admin.users') }}" class="nav-link {{ 'active' if 'users' in request.endpoint }}">
+        <i class="fas fa-users icon"></i> Users
+      </a>
+      <a href="{{ url_for('admin.sites') }}" class="nav-link {{ 'active' if request.endpoint == 'admin.sites' }}">
+        <i class="fas fa-globe icon"></i> Sites
+      </a>
+      <a href="{{ url_for('admin.databases') }}" class="nav-link {{ 'active' if request.endpoint == 'admin.databases' }}">
+        <i class="fas fa-database icon"></i> Databases
+      </a>
+      <a href="{{ url_for('admin.backups') }}" class="nav-link {{ 'active' if request.endpoint == 'admin.backups' }}">
+        <i class="fas fa-cloud-arrow-up icon"></i> Backups
+      </a>
+      <a href="{{ url_for('admin.logs') }}" class="nav-link {{ 'active' if request.endpoint == 'admin.logs' }}">
+        <i class="fas fa-terminal icon"></i> Logs
+      </a>
+      <a href="{{ url_for('admin.announcements') }}" class="nav-link {{ 'active' if request.endpoint == 'admin.announcements' }}">
+        <i class="fas fa-megaphone icon"></i> Announcements
+      </a>
+      <a href="{{ url_for('admin.monitoring') }}" class="nav-link {{ 'active' if request.endpoint == 'admin.monitoring' }}">
+        <i class="fas fa-activity icon"></i> Monitoring
+      </a>
+      <a href="{{ url_for('admin.security') }}" class="nav-link {{ 'active' if request.endpoint == 'admin.security' }}">
+        <i class="fas fa-shield icon"></i> Security
+      </a>
+      {% if current_user and current_user.role == 'super_admin' %}
+      <a href="{{ url_for('admin.settings') }}" class="nav-link {{ 'active' if request.endpoint == 'admin.settings' }}">
+        <i class="fas fa-gear icon"></i> Settings
+      </a>
+      {% endif %}
+
+      <p class="section-label">Navigation</p>
+      <a href="{{ url_for('dashboard.index') }}" class="nav-link">
+        <i class="fas fa-arrow-left icon"></i> Back to Dashboard
+      </a>
+    </nav>
+  </aside>
+
+  <!-- Main -->
+  <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+    <header class="flex items-center justify-between px-5 py-3 flex-shrink-0"
+            style="background:#0a0a0b; border-bottom:1px solid rgba(255,255,255,0.07)">
+      <div class="flex items-center gap-3">
+        <span class="text-[11px] font-bold text-red-500/80 uppercase tracking-widest">Admin Mode</span>
+        {% if session.get('impersonator_id') %}
+          <a href="{{ url_for('admin.stop_impersonation') }}"
+             class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 text-xs font-medium hover:bg-yellow-500/15">
+            <i class="fas fa-user-secret text-xs"></i> Exit impersonation
+          </a>
+        {% endif %}
+      </div>
+      <div class="flex items-center gap-2.5">
+        <span class="text-xs text-zinc-600">{{ current_user.email if current_user }}</span>
+        <span class="badge badge-red">{{ current_user.role if current_user }}</span>
+      </div>
+    </header>
+
+    <main class="flex-1 overflow-y-auto p-5 lg:p-7" style="background:#0d0d0f">
+      {% block admin_content %}{% endblock %}
+    </main>
+  </div>
+</div>
+
+{% block scripts %}{% endblock %}
+{% endblock %}

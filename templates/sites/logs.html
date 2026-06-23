@@ -1,0 +1,67 @@
+{% extends "partials/dash_layout.html" %}
+{% block title %}Deployment Logs — {{ site.name }} — {{ platform_name }}{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto space-y-5 animate-fade-in">
+  <div>
+    <a href="{{ url_for('sites.manage', site_id=site.id) }}" class="text-zinc-500 hover:text-zinc-300 text-sm flex items-center gap-1 mb-2">
+      <i class="fas fa-arrow-left text-xs"></i> {{ site.name }}
+    </a>
+    <h1 class="text-2xl font-bold text-white">Deployment Logs</h1>
+  </div>
+
+  {% if deps %}
+    <div class="space-y-4">
+      {% for dep in deps %}
+      <div class="card" x-data="{expanded: {{ 'true' if loop.first else 'false' }}}">
+        <button @click="expanded=!expanded"
+                class="w-full flex items-center gap-4 px-5 py-4 text-left">
+          <div class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0
+            {{ 'bg-green-500/10' if dep.status == 'success' else ('bg-red-500/10' if dep.status == 'failed' else 'bg-brand-500/10') }}">
+            <i class="fas fa-{% if dep.status == 'success' %}check{% elif dep.status == 'failed' %}times{% else %}spinner fa-spin{% endif %}
+              {{ 'text-green-400' if dep.status == 'success' else ('text-red-400' if dep.status == 'failed' else 'text-brand-400') }} text-sm"></i>
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-3">
+              <p class="text-sm font-semibold text-white">Deployment #{{ dep.id }}</p>
+              <span class="badge {{ 'badge-green' if dep.status == 'success' else ('badge-red' if dep.status == 'failed' else 'badge-blue') }} text-[11px]">
+                {{ dep.status }}
+              </span>
+            </div>
+            <p class="text-xs text-zinc-500 mt-0.5">
+              {{ dep.zip_filename or 'Unknown file' }} · {{ dep.started_at[:16] }}
+              {% if dep.finished_at %} · {{ dep.finished_at[:16] }}{% endif %}
+            </p>
+          </div>
+          <i class="fas fa-chevron-down text-zinc-500 text-xs transition-transform"
+             :class="expanded ? 'rotate-180' : ''"></i>
+        </button>
+
+        <div x-show="expanded" x-transition class="border-t border-white/[0.06] p-5">
+          {% if dep.log %}
+            <div class="bg-black/30 rounded-xl p-4 font-mono text-xs space-y-1 max-h-64 overflow-y-auto">
+              {% for line in dep.log.split('\n') %}
+                {% if line %}
+                <div class="flex items-start gap-2
+                  {{ 'text-red-400' if 'ERROR' in line else ('text-green-400' if ('complete' in line.lower() or 'OK' in line or 'success' in line.lower()) else 'text-zinc-400') }}">
+                  <span class="text-zinc-700 flex-shrink-0">›</span>
+                  <span>{{ line }}</span>
+                </div>
+                {% endif %}
+              {% endfor %}
+            </div>
+          {% else %}
+            <p class="text-sm text-zinc-600 text-center py-4">No log available.</p>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="card p-12 text-center">
+      <i class="fas fa-terminal text-zinc-700 text-4xl mb-3"></i>
+      <p class="text-zinc-500 text-sm">No deployments yet. Upload your first ZIP to get started.</p>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

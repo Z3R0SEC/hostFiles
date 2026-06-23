@@ -1,0 +1,174 @@
+{% extends "partials/dash_layout.html" %}
+{% block title %}Deploying — {{ site.name }} — {{ platform_name }}{% endblock %}
+
+{% block content %}
+{% set _h = request.host %}
+{% set _bare = _h.split(':')[0] %}
+{% set _is_local = _bare in ('localhost','127.0.0.1','0.0.0.0') %}
+{% macro site_url(sub) %}{{ request.scheme }}://{% if _is_local %}{{ _h }}/preview/{{ sub }}{% else %}{{ sub }}.{{ _bare }}{% endif %}{% endmacro %}
+<div class="max-w-xl animate-fade-in" x-data="deployProgress({{ dep_id }})">
+
+  <div class="mb-6">
+    <h1 class="text-xl font-bold text-white">Deploying {{ site.name }}</h1>
+    <p class="text-zinc-500 text-sm mt-1">This usually completes in under a minute.</p>
+  </div>
+
+  <!-- Stage pipeline -->
+  <div class="card p-5 mb-4">
+    <div class="space-y-3">
+      {% set stages = [
+        ('uploading',  'fas fa-cloud-arrow-up',  'Upload'),
+        ('extracting', 'fas fa-file-zipper',     'Extract'),
+        ('validating', 'fas fa-shield-halved',   'Validate'),
+        ('deploying',  'fas fa-rocket',          'Deploy'),
+        ('done',       'fas fa-circle-check',    'Complete'),
+      ] %}
+      {% for key, icon, label in stages %}
+      <div class="flex items-center gap-4">
+        <div class="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 transition-all duration-300"
+             :class="{
+               'bg-brand-600/15 border border-brand-600/25': currentStage === '{{ key }}',
+               'bg-green-500/10 border border-green-500/20': stagesDone.includes('{{ key }}'),
+               'bg-white/3 border border-white/6': !stagesDone.includes('{{ key }}') && currentStage !== '{{ key }}'
+             }">
+          <i class="{{ icon }} text-sm transition-colors"
+             :class="{
+               'text-brand-400': currentStage === '{{ key }}',
+               'text-green-400': stagesDone.includes('{{ key }}'),
+               'text-zinc-700': !stagesDone.includes('{{ key }}') && currentStage !== '{{ key }}'
+             }"></i>
+        </div>
+        <div class="flex-1">
+          <p class="text-sm font-medium transition-colors"
+             :class="{
+               'text-white': currentStage === '{{ key }}',
+               'text-green-400': stagesDone.includes('{{ key }}'),
+               'text-zinc-700': !stagesDone.includes('{{ key }}') && currentStage !== '{{ key }}'
+             }">{{ label }}</p>
+        </div>
+        <div class="w-5 text-center">
+          <i class="fas fa-check text-green-400 text-xs" x-show="stagesDone.includes('{{ key }}')"></i>
+          <i class="fas fa-circle-notch fa-spin text-brand-400 text-xs" x-show="currentStage === '{{ key }}'"></i>
+          <i class="fas fa-circle text-zinc-800 text-[8px]"
+             x-show="!stagesDone.includes('{{ key }}') && currentStage !== '{{ key }}'"></i>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Live log -->
+  <div class="card">
+    <div class="px-4 py-2.5 flex items-center gap-2.5" style="border-bottom:1px solid rgba(255,255,255,0.07)">
+      <span class="status-dot pending" x-show="status === 'pending'"></span>
+      <span class="status-dot online" x-show="status === 'success'"></span>
+      <span class="status-dot offline" x-show="status === 'failed'"></span>
+      <span class="text-[11px] font-semibold text-zinc-500 uppercase tracking-widest">Deploy Log</span>
+    </div>
+    <div class="p-4 font-mono text-xs space-y-1 max-h-52 overflow-y-auto" id="log-container">
+      <template x-for="(line, i) in logLines" :key="i">
+        <div class="flex items-start gap-2"
+             :class="line.includes('ERROR') ? 'text-red-400' : (line.toLowerCase().includes('complete') || line.includes('OK') ? 'text-green-400' : 'text-zinc-500')">
+          <span class="text-zinc-700 flex-shrink-0 select-none">›</span>
+          <span x-text="line"></span>
+        </div>
+      </template>
+      <div id="log-end"></div>
+    </div>
+  </div>
+
+  <!-- Success state -->
+  <div x-show="status === 'success'" x-transition
+       class="mt-5 p-5 rounded-xl bg-green-500/5 border border-green-500/15 text-center">
+    <div class="w-11 h-11 rounded-xl bg-green-500/10 border border-green-500/20 flex items-center justify-center mx-auto mb-3">
+      <i class="fas fa-rocket text-green-400 text-base"></i>
+    </div>
+    <h2 class="text-base font-bold text-white mb-1">Deployed successfully</h2>
+    <p class="text-zinc-500 text-sm mb-4">Your site is live and ready.</p>
+    <div class="flex gap-2.5 justify-center">
+      <a href="{{ url_for('sites.manage', site_id=site.id) }}" class="btn btn-primary">
+        <i class="fas fa-gear text-xs"></i> Manage Site
+      </a>
+      <a href="{{ site_url(site.subdomain) }}" target="_blank" class="btn btn-secondary">
+        <i class="fas fa-arrow-up-right-from-square text-xs"></i> View Live
+      </a>
+    </div>
+  </div>
+
+  <!-- Failed state -->
+  <div x-show="status === 'failed'" x-transition
+       class="mt-5 p-5 rounded-xl bg-red-500/5 border border-red-500/15 text-center">
+    <div class="w-11 h-11 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto mb-3">
+      <i class="fas fa-circle-xmark text-red-400 text-base"></i>
+    </div>
+    <h2 class="text-base font-bold text-white mb-1">Deployment failed</h2>
+    <p class="text-zinc-500 text-sm mb-4">Check the log above for details.</p>
+    <a href="{{ url_for('sites.deploy', site_id=site.id) }}" class="btn btn-primary">
+      <i class="fas fa-rotate-right text-xs"></i> Try Again
+    </a>
+  </div>
+
+</div>
+
+{% block scripts %}
+<script>
+function deployProgress(depId) {
+  return {
+    status: '{{ dep.status }}',
+    currentStage: 'uploading',
+    stagesDone: [],
+    logLines: [],
+
+    init() {
+      socket.emit('join_deployment', { dep_id: depId });
+
+      socket.on('deploy_progress', (data) => {
+        if (data.msg) this.logLines.push(data.msg);
+        if (data.stage && data.stage !== 'error') {
+          const order = ['uploading','extracting','validating','deploying','done'];
+          const idx = order.indexOf(data.stage);
+          if (idx >= 0) {
+            this.stagesDone = order.slice(0, idx);
+            this.currentStage = data.stage;
+          }
+        }
+        this.$nextTick(() => {
+          const el = document.getElementById('log-end');
+          if (el) el.scrollIntoView({ behavior: 'smooth' });
+        });
+      });
+
+      socket.on('deploy_done', (data) => {
+        this.status = data.success ? 'success' : 'failed';
+        this.stagesDone = ['uploading','extracting','validating','deploying','done'];
+        this.currentStage = '';
+      });
+
+      // Polling fallback
+      if (this.status === 'pending') {
+        this.poll();
+      }
+    },
+
+    poll() {
+      const interval = setInterval(async () => {
+        try {
+          const res = await fetch('{{ url_for("sites.deploy_status", site_id=site.id, dep_id=dep_id) }}');
+          const data = await res.json();
+          if (data.status === 'success' || data.status === 'failed') {
+            this.status = data.status;
+            if (data.log) {
+              this.logLines = data.log.split('\n').filter(Boolean);
+            }
+            this.stagesDone = ['uploading','extracting','validating','deploying','done'];
+            this.currentStage = '';
+            clearInterval(interval);
+          }
+        } catch(e) { /* ignore */ }
+      }, 2500);
+    }
+  }
+}
+</script>
+{% endblock %}
+{% endblock %}

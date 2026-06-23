@@ -1,0 +1,29 @@
+# HostFlow Platform — Python Dependencies
+
+# Core Flask
+Flask==3.0.3
+Flask-Session==0.8.0
+Flask-WTF==1.2.1
+Flask-Limiter==3.8.0
+Flask-SocketIO==5.3.6
+
+# Sitemap
+Flask-Sitemap==0.3.0
+
+# Async/WebSocket
+eventlet==0.36.1
+
+# Database
+PyMySQL==1.1.1
+
+# HTTP client (external API calls)
+requests==2.31.0
+
+# System monitoring
+psutil==5.9.8
+
+# Security
+Werkzeug==3.0.3
+
+# Jinja2 (bundled with Flask, but pinned)
+Jinja2==3.1.4

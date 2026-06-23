@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+{% block title %}{{ platform_name }} — Modern Shared Hosting{% endblock %}
+{% block meta_desc %}Deploy PHP and HTML websites in seconds. Free hosting with MariaDB, file manager, backups, and more.{% endblock %}
+
+{% block body %}
+
+<!-- Nav -->
+<nav class="fixed top-0 inset-x-0 z-50"
+     style="background:rgba(13,13,15,0.92); backdrop-filter:blur(16px); border-bottom:1px solid rgba(255,255,255,0.06)">
+  <div class="max-w-5xl mx-auto flex items-center justify-between px-6 py-3.5">
+    <a href="{{ url_for('public.home') }}" class="flex items-center gap-2.5">
+      <div class="w-7 h-7 rounded-lg bg-brand-600 flex items-center justify-center">
+        <i class="fas fa-server text-white text-xs"></i>
+      </div>
+      <span class="font-bold text-white text-sm">{{ platform_name }}</span>
+    </a>
+    <div class="hidden md:flex items-center gap-6">
+      <a href="{{ url_for('public.features') }}" class="text-xs text-zinc-500 hover:text-zinc-300 transition-colors font-medium">Features</a>
+      <a href="{{ url_for('public.pricing') }}" class="text-xs text-zinc-500 hover:text-zinc-300 transition-colors font-medium">Pricing</a>
+      <a href="{{ url_for('public.contact') }}" class="text-xs text-zinc-500 hover:text-zinc-300 transition-colors font-medium">Contact</a>
+    </div>
+    <div class="flex items-center gap-2.5">
+      <a href="{{ url_for('auth.login') }}" class="text-xs text-zinc-500 hover:text-zinc-300 transition-colors font-medium">Sign in</a>
+      <a href="{{ url_for('auth.register') }}" class="btn btn-primary text-xs px-4 py-2">Get Started</a>
+    </div>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="relative min-h-screen flex items-center justify-center text-center px-6 pt-20"
+         style="background: radial-gradient(ellipse 90% 55% at 50% -5%, rgba(37,99,235,0.12) 0%, transparent 65%), #0d0d0f">
+
+  <!-- Subtle grid -->
+  <div class="absolute inset-0 pointer-events-none"
+       style="background-image:linear-gradient(rgba(255,255,255,.018) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.018) 1px,transparent 1px);background-size:48px 48px; mask-image:radial-gradient(ellipse 80% 80% at 50% 50%, black 40%, transparent 100%)"></div>
+
+  <div class="relative z-10 max-w-3xl mx-auto animate-fade-in">
+    <!-- Status badge -->
+    <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full mb-8"
+         style="border:1px solid rgba(37,99,235,0.25); background:rgba(37,99,235,0.08)">
+      <span class="status-dot online"></span>
+      <span class="text-xs font-semibold text-brand-300 tracking-wide">Free Hosting — No Credit Card Required</span>
+    </div>
+
+    <h1 class="text-4xl md:text-6xl font-extrabold text-white mb-5 leading-tight tracking-tight">
+      Host your website<br/>
+      <span style="background:linear-gradient(130deg,#60a5fa 0%,#3b82f6 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">
+        in seconds.
+      </span>
+    </h1>
+
+    <p class="text-base text-zinc-400 mb-8 max-w-xl mx-auto leading-relaxed">
+      Upload a ZIP file. We handle PHP, MariaDB, backups, and deployment —
+      a developer-first experience for traditional web hosting.
+    </p>
+
+    <div class="flex flex-wrap gap-3 justify-center">
+      <a href="{{ url_for('auth.register') }}" class="btn btn-primary text-sm px-6 py-2.5"
+         style="box-shadow:0 4px 20px rgba(37,99,235,0.35)">
+        <i class="fas fa-rocket text-xs"></i> Start Hosting Free
+      </a>
+      <a href="{{ url_for('public.features') }}" class="btn btn-secondary text-sm px-6 py-2.5">
+        See Features
+      </a>
+    </div>
+
+    <!-- Stats -->
+    <div class="flex flex-wrap justify-center gap-10 mt-14 pt-8"
+         style="border-top:1px solid rgba(255,255,255,0.06)">
+      {% for val, label in [
+        (stats.total_users, 'Developers'),
+        (stats.active_sites, 'Live Sites'),
+        (stats.total_databases, 'Databases'),
+      ] %}
+      <div class="text-center">
+        <p class="text-2xl font-bold text-white">{{ val }}+</p>
+        <p class="text-xs text-zinc-600 mt-0.5">{{ label }}</p>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- Features -->
+<section class="py-20 px-6" style="background:#0f0f11">
+  <div class="max-w-5xl mx-auto">
+    <div class="text-center mb-12">
+      <h2 class="text-2xl md:text-3xl font-bold text-white mb-3">Everything you need to ship</h2>
+      <p class="text-zinc-500 text-sm max-w-lg mx-auto">Production-grade infrastructure with a developer-first experience. No configuration required.</p>
+    </div>
+
+    <div class="grid md:grid-cols-3 gap-4">
+      {% for icon, color, bg, title, desc in [
+        ('fas fa-rocket', 'text-brand-400', 'bg-brand-600/8', 'ZIP Deploy', 'Upload a ZIP and your site is live instantly. PHP and static sites supported.'),
+        ('fas fa-database', 'text-purple-400', 'bg-purple-500/8', 'Auto MariaDB', 'Each site gets a dedicated MariaDB database auto-provisioned on first deploy.'),
+        ('fas fa-folder-open', 'text-amber-400', 'bg-amber-500/8', 'File Manager', 'Browser-based file manager with live code editing. No FTP needed.'),
+        ('fas fa-cloud-arrow-up', 'text-cyan-400', 'bg-cyan-500/8', 'Backups', 'One-click ZIP backups of your entire site. Download or restore any time.'),
+        ('fas fa-shield-halved', 'text-green-400', 'bg-green-500/8', 'Secure Default', 'CSRF protection, rate limiting, Zip-Slip prevention, and secure sessions.'),
+        ('fas fa-bolt', 'text-yellow-400', 'bg-yellow-500/8', 'Live Progress', 'Real-time deployment progress via WebSockets. Watch every step.'),
+      ] %}
+      <div class="card p-5 card-hover transition-all">
+        <div class="w-9 h-9 rounded-lg {{ bg }} border border-white/5 flex items-center justify-center mb-3">
+          <i class="{{ icon }} {{ color }} text-sm"></i>
+        </div>
+        <h3 class="text-sm font-bold text-white mb-1.5">{{ title }}</h3>
+        <p class="text-zinc-500 text-xs leading-relaxed">{{ desc }}</p>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- How it works -->
+<section class="py-20 px-6" style="background:#0d0d0f">
+  <div class="max-w-3xl mx-auto text-center">
+    <h2 class="text-2xl md:text-3xl font-bold text-white mb-2">Deploy in 3 steps</h2>
+    <p class="text-zinc-500 text-sm mb-12">From zero to live website in under two minutes.</p>
+
+    <div class="grid md:grid-cols-3 gap-6">
+      {% for icon, step, title, desc in [
+        ('fas fa-user-plus', '01', 'Create Account', 'Sign up free in seconds. No credit card, no contract.'),
+        ('fas fa-file-zipper', '02', 'Upload ZIP', 'Compress your files and upload. We validate and deploy automatically.'),
+        ('fas fa-globe', '03', 'Go Live', 'Your site is live on your subdomain with PHP and database ready.'),
+      ] %}
+      <div>
+        <div class="w-12 h-12 rounded-xl bg-brand-600 flex items-center justify-center mx-auto mb-4"
+             style="box-shadow:0 4px 16px rgba(37,99,235,0.3)">
+          <i class="{{ icon }} text-white text-base"></i>
+        </div>
+        <p class="text-[11px] font-bold text-zinc-700 tracking-widest mb-1.5">{{ step }}</p>
+        <h3 class="text-sm font-bold text-white mb-1.5">{{ title }}</h3>
+        <p class="text-zinc-500 text-xs leading-relaxed">{{ desc }}</p>
+      </div>
+      {% endfor %}
+    </div>
+
+    <a href="{{ url_for('auth.register') }}" class="btn btn-primary text-sm px-7 py-2.5 mt-10 inline-flex"
+       style="box-shadow:0 4px 20px rgba(37,99,235,0.3)">
+      <i class="fas fa-rocket text-xs"></i> Get Started Now
+    </a>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer style="border-top:1px solid rgba(255,255,255,0.06); background:#0a0a0c; padding: 2rem 1.5rem">
+  <div class="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+    <div class="flex items-center gap-2.5">
+      <div class="w-6 h-6 rounded-lg bg-brand-600 flex items-center justify-center">
+        <i class="fas fa-server text-white text-[10px]"></i>
+      </div>
+      <span class="font-bold text-white text-sm">{{ platform_name }}</span>
+    </div>
+    <div class="flex items-center gap-5 text-xs text-zinc-600">
+      <a href="{{ url_for('public.features') }}" class="hover:text-zinc-400 transition-colors">Features</a>
+      <a href="{{ url_for('public.pricing') }}" class="hover:text-zinc-400 transition-colors">Pricing</a>
+      <a href="{{ url_for('public.terms') }}" class="hover:text-zinc-400 transition-colors">Terms</a>
+      <a href="{{ url_for('public.privacy') }}" class="hover:text-zinc-400 transition-colors">Privacy</a>
+      <a href="{{ url_for('public.contact') }}" class="hover:text-zinc-400 transition-colors">Contact</a>
+    </div>
+    <p class="text-xs text-zinc-700">&copy; {{ now_year }} {{ platform_name }}</p>
+  </div>
+</footer>
+{% endblock %}

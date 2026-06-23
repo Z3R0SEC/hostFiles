@@ -1,0 +1,224 @@
+{% extends "partials/dash_layout.html" %}
+{% block title %}Database — {{ site.name }} — {{ platform_name }}{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto space-y-5 animate-fade-in">
+
+  <div>
+    <a href="{{ url_for('sites.manage', site_id=site.id) }}"
+       class="text-zinc-600 hover:text-zinc-400 text-xs flex items-center gap-1.5 mb-4 transition-colors">
+      <i class="fas fa-arrow-left text-[10px]"></i> {{ site.name }}
+    </a>
+    <div class="flex items-center justify-between flex-wrap gap-3">
+    <h1 class="text-xl font-bold text-white">Database</h1>
+    <a href="{{ url_for('databases.manager', site_id=site.id) }}"
+       class="btn btn-primary text-xs">
+      <i class="fas fa-terminal text-xs"></i> SQL Manager
+    </a>
+  </div>
+    <p class="text-zinc-500 text-sm mt-1">Your database credentials for <strong class="text-zinc-300">{{ site.name }}</strong>.</p>
+  </div>
+
+  {% if db_info %}
+    {% set is_sqlite = db_info.db_host == 'sqlite_local' %}
+
+    <!-- Mode banner -->
+    {% if is_sqlite %}
+    <div class="flex items-start gap-3 px-4 py-3 rounded-xl border border-blue-500/15 bg-blue-500/5">
+      <i class="fas fa-circle-info text-blue-400 mt-0.5 flex-shrink-0"></i>
+      <div>
+        <p class="text-sm font-semibold text-blue-300">SQLite Mode (localhost)</p>
+        <p class="text-xs text-zinc-400 mt-0.5 leading-relaxed">
+          No MySQL/MariaDB was detected, so your site uses a SQLite database file.
+          This is perfect for development. For production, set
+          <code class="text-blue-300 bg-blue-500/10 px-1 rounded">MYSQL_ROOT_PASSWORD</code>
+          in your <code class="text-blue-300 bg-blue-500/10 px-1 rounded">.env</code> file to enable MariaDB.
+        </p>
+      </div>
+    </div>
+    {% else %}
+    <div class="flex items-start gap-3 px-4 py-3 rounded-xl border border-green-500/15 bg-green-500/5">
+      <i class="fas fa-circle-check text-green-400 mt-0.5 flex-shrink-0"></i>
+      <div>
+        <p class="text-sm font-semibold text-green-300">MariaDB / MySQL Active</p>
+        <p class="text-xs text-zinc-400 mt-0.5">A dedicated database was provisioned for this site.</p>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Credentials card -->
+    <div class="card p-5">
+      <div class="flex items-center justify-between mb-4">
+        <p class="text-[11px] font-semibold text-zinc-600 uppercase tracking-widest">Connection Details</p>
+        <span class="badge {{ 'badge-green' if db_info.status == 'active' else 'badge-red' }}">
+          {{ db_info.status.title() }}
+        </span>
+      </div>
+
+      {% if is_sqlite %}
+        <!-- SQLite info -->
+        <div class="space-y-2.5">
+          {% set sqlite_items = [
+            ('Type',     'SQLite (file-based)',         'fas fa-database',      False),
+            ('DB File',  db_info.db_name,               'fas fa-file',          True),
+          ] %}
+          {% for label, val, icon, copyable in sqlite_items %}
+          <div class="flex items-center gap-3 p-3 rounded-lg bg-white/3 border border-white/6">
+            <div class="w-8 h-8 rounded-md bg-brand-600/8 flex items-center justify-center flex-shrink-0">
+              <i class="{{ icon }} text-brand-400 text-xs"></i>
+            </div>
+            <div class="flex-1 min-w-0">
+              <p class="text-[11px] text-zinc-700">{{ label }}</p>
+              <p class="text-xs font-mono text-zinc-300 truncate mt-0.5">{{ val }}</p>
+            </div>
+            {% if copyable %}
+            <button onclick="copyToClipboard('{{ val }}')"
+                    class="w-7 h-7 rounded-md bg-white/5 hover:bg-white/10 flex items-center justify-center text-zinc-600 hover:text-zinc-300 transition-colors">
+              <i class="fas fa-copy text-xs"></i>
+            </button>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+
+        <!-- How to use SQLite in PHP -->
+        <div class="mt-5 p-4 rounded-xl bg-white/3 border border-white/6">
+          <p class="text-xs font-semibold text-zinc-400 mb-3">Use this database in your PHP code:</p>
+          <pre class="text-xs font-mono text-zinc-300 leading-relaxed overflow-x-auto whitespace-pre-wrap"><?php
+$db_path = '{{ db_info.db_name }}';
+$db = new PDO('sqlite:' . $db_path);
+$db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+
+// Create a table (example)
+$db->exec("CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT,
+    email TEXT UNIQUE
+)");
+
+// Insert data
+$stmt = $db->prepare("INSERT INTO users (name, email) VALUES (?, ?)");
+$stmt->execute(['Alice', 'alice@example.com']);
+
+// Query data
+foreach ($db->query("SELECT * FROM users") as $row) {
+    echo $row['name'] . ' — ' . $row['email'] . "\n";
+}
+?></pre>
+        </div>
+
+      {% else %}
+        <!-- MySQL/MariaDB credentials -->
+        {% set items = [
+          ('Host',     db_info.db_host,     'fas fa-server',   False),
+          ('Port',     db_info.db_port|string, 'fas fa-plug',  False),
+          ('Database', db_info.db_name,     'fas fa-database', True),
+          ('Username', db_info.db_user,     'fas fa-user',     True),
+          ('Password', db_info.db_password, 'fas fa-key',      True),
+        ] %}
+        <div class="space-y-2.5">
+          {% for label, val, icon, copyable in items %}
+          <div class="flex items-center gap-3 p-3 rounded-lg bg-white/3 border border-white/6"
+               {% if label == 'Password' %}x-data="{show:false}"{% endif %}>
+            <div class="w-8 h-8 rounded-md bg-brand-600/8 flex items-center justify-center flex-shrink-0">
+              <i class="{{ icon }} text-brand-400 text-xs"></i>
+            </div>
+            <div class="flex-1 min-w-0">
+              <p class="text-[11px] text-zinc-700">{{ label }}</p>
+              {% if label == 'Password' %}
+                <p class="text-xs font-mono text-zinc-300 mt-0.5 transition-all"
+                   :class="show ? '' : 'blur-sm select-none'">{{ val }}</p>
+              {% else %}
+                <p class="text-xs font-mono text-zinc-300 mt-0.5 truncate">{{ val }}</p>
+              {% endif %}
+            </div>
+            <div class="flex items-center gap-1.5 flex-shrink-0">
+              {% if label == 'Password' %}
+              <button @click="show=!show"
+                      class="w-7 h-7 rounded-md bg-white/5 hover:bg-white/10 flex items-center justify-center text-zinc-600 hover:text-zinc-300 transition-colors">
+                <i :class="show ? 'fas fa-eye-slash' : 'fas fa-eye'" class="text-xs"></i>
+              </button>
+              {% endif %}
+              {% if copyable %}
+              <button onclick="copyToClipboard('{{ val }}')"
+                      class="w-7 h-7 rounded-md bg-white/5 hover:bg-white/10 flex items-center justify-center text-zinc-600 hover:text-zinc-300 transition-colors">
+                <i class="fas fa-copy text-xs"></i>
+              </button>
+              {% endif %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+
+        <!-- How to use in PHP -->
+        <div class="mt-5 p-4 rounded-xl bg-white/3 border border-white/6">
+          <p class="text-xs font-semibold text-zinc-400 mb-3">Use this database in your PHP code:</p>
+          <pre class="text-xs font-mono text-zinc-300 leading-relaxed overflow-x-auto whitespace-pre-wrap"><?php
+$db = new PDO(
+    'mysql:host={{ db_info.db_host }};port={{ db_info.db_port }};dbname={{ db_info.db_name }};charset=utf8mb4',
+    '{{ db_info.db_user }}',
+    'YOUR_PASSWORD_HERE'   // store in .env, not hardcoded
+);
+$db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+
+// Create a table (example)
+$db->exec("CREATE TABLE IF NOT EXISTS users (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255),
+    email VARCHAR(255) UNIQUE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+// Insert data
+$stmt = $db->prepare("INSERT INTO users (name, email) VALUES (?, ?)");
+$stmt->execute(['Alice', 'alice@example.com']);
+
+// Query data
+foreach ($db->query("SELECT * FROM users") as $row) {
+    echo $row['name'] . ' — ' . $row['email'] . "\n";
+}
+?></pre>
+        </div>
+
+        <!-- Reset password -->
+        <form method="POST"
+              action="{{ url_for('databases.reset_password', site_id=site.id) }}"
+              class="mt-5"
+              onsubmit="return confirm('Reset the database password? You will need to update your site config.')">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+          <button type="submit" class="btn btn-danger text-xs">
+            <i class="fas fa-rotate-right text-xs"></i> Reset DB Password
+          </button>
+        </form>
+      {% endif %}
+    </div>
+
+  {% else %}
+    <!-- No DB provisioned -->
+    <div class="card p-10 text-center">
+      <div class="w-12 h-12 rounded-xl bg-brand-600/8 border border-brand-600/15 flex items-center justify-center mx-auto mb-4">
+        <i class="fas fa-database text-brand-400 text-base"></i>
+      </div>
+      <h2 class="text-base font-bold text-white mb-1.5">No database yet</h2>
+      <p class="text-zinc-500 text-sm mb-5 max-w-xs mx-auto leading-relaxed">
+        A database is provisioned automatically when you create a site and deploy your first ZIP file.
+      </p>
+      <a href="{{ url_for('sites.deploy', site_id=site.id) }}" class="btn btn-primary">
+        <i class="fas fa-rocket text-xs"></i> Deploy Site Now
+      </a>
+    </div>
+  {% endif %}
+
+</div>
+
+{% block scripts %}
+<script>
+function copyToClipboard(text) {
+  navigator.clipboard.writeText(text).then(() => {
+    window.dispatchEvent(new CustomEvent('toast', {
+      detail: { message: 'Copied to clipboard!', icon: 'fas fa-check text-green-400' }
+    }));
+  });
+}
+</script>
+{% endblock %}
+{% endblock %}

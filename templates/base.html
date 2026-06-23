@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>{% block title %}{{ platform_name }}{% endblock %}</title>
+  <meta name="description" content="{% block meta_desc %}Modern shared hosting platform.{% endblock %}"/>
+  <link rel="icon" href="{{ url_for('static', filename='img/favicon.svg') }}"/>
+
+  <!-- Tailwind CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50:  '#eff6ff',
+              100: '#dbeafe',
+              300: '#93c5fd',
+              400: '#60a5fa',
+              500: '#3b82f6',
+              600: '#2563eb',
+              700: '#1d4ed8',
+              900: '#1e3a8a',
+            },
+            surface: {
+              950: '#080809',
+              900: '#0d0d0f',
+              850: '#111113',
+              800: '#141416',
+              700: '#1c1c1f',
+              600: '#222226',
+              500: '#2a2a2f',
+              400: '#36363d',
+            },
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'ui-monospace', 'monospace'],
+          },
+          boxShadow: {
+            'card': '0 1px 3px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.3)',
+            'card-hover': '0 4px 12px rgba(0,0,0,0.5), 0 2px 4px rgba(0,0,0,0.3)',
+            'glow': '0 0 24px rgba(59,130,246,0.15)',
+          },
+          animation: {
+            'slide-up': 'slideUp .2s ease-out',
+            'fade-in': 'fadeIn .25s ease-out',
+            'pulse-dot': 'pulseDot 2s ease-in-out infinite',
+          },
+          keyframes: {
+            slideUp: { from:{transform:'translateY(6px)',opacity:'0'}, to:{transform:'translateY(0)',opacity:'1'} },
+            fadeIn: { from:{opacity:'0'}, to:{opacity:'1'} },
+            pulseDot: { '0%,100%':{opacity:'1',transform:'scale(1)'}, '50%':{opacity:'.5',transform:'scale(.85)'} },
+          },
+        }
+      }
+    }
+  </script>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <!-- Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <!-- Alpine.js -->
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/alpinejs/3.13.3/cdn.min.js"></script>
+  <!-- SocketIO -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.6.0/socket.io.min.js"></script>
+
+  <style>
+    :root { color-scheme: dark; }
+
+    body {
+      background-color: #0d0d0f;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* ── Scrollbar ── */
+    * { scrollbar-width: thin; scrollbar-color: #2a2a2f transparent; }
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #2a2a2f; border-radius: 4px; }
+
+    /* ── Cards ── */
+    .card {
+      background: #141416;
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+    }
+    .card-hover:hover {
+      border-color: rgba(255,255,255,0.11);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+    }
+
+    /* ── Sidebar nav ── */
+    .nav-link {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 7px 10px;
+      border-radius: 8px;
+      color: #71717a;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      transition: color .15s, background .15s;
+      white-space: nowrap;
+    }
+    .nav-link:hover { background: rgba(255,255,255,0.05); color: #a1a1aa; }
+    .nav-link.active { background: rgba(59,130,246,0.1); color: #93c5fd; }
+    .nav-link .icon { width: 16px; text-align: center; flex-shrink: 0; }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 7px 14px;
+      border-radius: 8px;
+      font-size: 0.8125rem;
+      font-weight: 600;
+      transition: all .15s;
+      cursor: pointer;
+      border: none;
+      white-space: nowrap;
+    }
+    .btn-primary {
+      background: #2563eb;
+      color: #fff;
+      box-shadow: 0 1px 3px rgba(37,99,235,0.4);
+    }
+    .btn-primary:hover { background: #1d4ed8; box-shadow: 0 4px 12px rgba(37,99,235,0.35); }
+    .btn-secondary {
+      background: rgba(255,255,255,0.06);
+      color: #a1a1aa;
+      border: 1px solid rgba(255,255,255,0.09);
+    }
+    .btn-secondary:hover { background: rgba(255,255,255,0.1); color: #e4e4e7; }
+    .btn-danger {
+      background: rgba(239,68,68,0.1);
+      color: #f87171;
+      border: 1px solid rgba(239,68,68,0.2);
+    }
+    .btn-danger:hover { background: rgba(239,68,68,0.18); }
+
+    /* ── Form inputs ── */
+    .field {
+      width: 100%;
+      padding: 9px 12px;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.1);
+      color: #e4e4e7;
+      font-size: 0.875rem;
+      outline: none;
+      transition: border-color .15s, background .15s;
+    }
+    .field:focus { border-color: #3b82f6; background: rgba(59,130,246,0.04); }
+    .field::placeholder { color: #52525b; }
+
+    /* Alias for backwards compat */
+    .input-field { @apply field; }
+    /* Force the alias since Tailwind @apply may not work in <style> */
+    .input-field {
+      width: 100%;
+      padding: 9px 12px;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.1);
+      color: #e4e4e7;
+      font-size: 0.875rem;
+      outline: none;
+      transition: border-color .15s, background .15s;
+    }
+    .input-field:focus { border-color: #3b82f6; background: rgba(59,130,246,0.04); }
+    .input-field::placeholder { color: #52525b; }
+
+    /* ── Badges ── */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+    }
+    .badge-green  { background: rgba(34,197,94,0.12);  color: #4ade80; border: 1px solid rgba(34,197,94,0.18); }
+    .badge-red    { background: rgba(239,68,68,0.12);  color: #f87171; border: 1px solid rgba(239,68,68,0.18); }
+    .badge-yellow { background: rgba(234,179,8,0.12);  color: #facc15; border: 1px solid rgba(234,179,8,0.18); }
+    .badge-blue   { background: rgba(59,130,246,0.12); color: #93c5fd; border: 1px solid rgba(59,130,246,0.18); }
+    .badge-gray   { background: rgba(113,113,122,0.15); color: #a1a1aa; border: 1px solid rgba(113,113,122,0.2); }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      z-index: 9999;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 12px 16px;
+      border-radius: 10px;
+      background: #1c1c1f;
+      border: 1px solid rgba(255,255,255,0.1);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+      min-width: 260px;
+      max-width: 340px;
+      animation: slideUp .2s ease-out;
+    }
+
+    /* ── Section divider ── */
+    .section-label {
+      font-size: 0.6875rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #3f3f46;
+      padding: 0 10px;
+      margin-top: 20px;
+      margin-bottom: 4px;
+    }
+
+    /* ── Skeleton ── */
+    .skeleton {
+      background: linear-gradient(90deg, #1c1c1f 25%, #222226 50%, #1c1c1f 75%);
+      background-size: 200%;
+      animation: shimmer 1.6s infinite;
+      border-radius: 6px;
+    }
+    @keyframes shimmer { 0%{background-position:200%} 100%{background-position:-200%} }
+
+    /* ── Status dot ── */
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .status-dot.online  { background: #22c55e; box-shadow: 0 0 6px rgba(34,197,94,0.5); animation: pulseDot 2s ease-in-out infinite; }
+    .status-dot.offline { background: #52525b; }
+    .status-dot.pending { background: #f59e0b; animation: pulseDot 1.5s ease-in-out infinite; }
+
+    /* ── Code / Mono ── */
+    .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+
+    /* ── Glass surface ── */
+    .glass {
+      background: rgba(20,20,22,0.85);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255,255,255,0.07);
+    }
+  </style>
+  {% block head %}{% endblock %}
+</head>
+<body class="font-sans text-zinc-300 min-h-screen bg-surface-900"
+      x-data="{ sidebarOpen: false, toasts: [] }"
+      @toast.window="toasts.push($event.detail); setTimeout(()=>toasts.shift(), 4500)">
+
+  {% block body %}{% endblock %}
+
+  <!-- Flash toasts -->
+  <div class="fixed bottom-5 right-5 z-[9999] flex flex-col gap-2" style="max-width:340px">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for cat, msg in messages %}
+        <div x-data="{show:true}" x-show="show"
+             x-init="setTimeout(()=>show=false, 5000)"
+             x-transition:enter="transition ease-out duration-200"
+             x-transition:enter-start="opacity-0 translate-y-2"
+             x-transition:enter-end="opacity-100 translate-y-0"
+             x-transition:leave="transition ease-in duration-150"
+             x-transition:leave-end="opacity-0 translate-y-1"
+             class="toast {% if cat=='success' %}border-green-500/25{% elif cat=='error' %}border-red-500/25{% elif cat=='warning' %}border-yellow-500/25{% else %}border-brand-500/25{% endif %}">
+          <div class="mt-0.5 flex-shrink-0">
+            <i class="fas fa-{% if cat=='success' %}check-circle text-green-400{% elif cat=='error' %}xmark-circle text-red-400{% elif cat=='warning' %}triangle-exclamation text-yellow-400{% else %}circle-info text-brand-400{% endif %} text-base"></i>
+          </div>
+          <p class="text-sm text-zinc-200 flex-1 leading-snug">{{ msg }}</p>
+          <button @click="show=false" class="text-zinc-600 hover:text-zinc-400 ml-1 flex-shrink-0">
+            <i class="fas fa-xmark text-xs"></i>
+          </button>
+        </div>
+      {% endfor %}
+    {% endwith %}
+
+    <!-- JS-triggered toasts -->
+    <template x-for="(t,i) in toasts" :key="i">
+      <div class="toast"
+           x-transition:enter="transition ease-out duration-200"
+           x-transition:enter-start="opacity-0 translate-y-2"
+           x-transition:enter-end="opacity-100 translate-y-0">
+        <i :class="t.icon || 'fas fa-circle-info text-brand-400'" class="text-base mt-0.5 flex-shrink-0"></i>
+        <p class="text-sm text-zinc-200 flex-1 leading-snug" x-text="t.message"></p>
+      </div>
+    </template>
+  </div>
+
+  {% block scripts %}{% endblock %}
+  <script>
+    // Global SocketIO — reconnect gracefully
+    const socket = io({ transports: ['polling', 'websocket'], reconnectionAttempts: 5 });
+    socket.on('notification', (data) => {
+      window.dispatchEvent(new CustomEvent('toast', {
+        detail: { message: data.title, icon: 'fas fa-bell text-brand-400' }
+      }));
+      const badge = document.getElementById('notif-badge');
+      if (badge && data.unread_count > 0) {
+        badge.textContent = data.unread_count > 9 ? '9+' : data.unread_count;
+        badge.classList.remove('hidden');
+      }
+    });
+  </script>
+</body>
+</html>

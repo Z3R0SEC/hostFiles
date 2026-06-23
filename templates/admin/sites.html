@@ -1,0 +1,67 @@
+{% extends "admin/admin_layout.html" %}
+{% block title %}Sites — Admin — {{ platform_name }}{% endblock %}
+{% block admin_content %}
+<div class="max-w-6xl mx-auto space-y-5 animate-fade-in">
+  <div>
+    <h1 class="text-2xl font-bold text-white">Sites</h1>
+    <p class="text-zinc-400 text-sm mt-1">{{ total }} websites on the platform</p>
+  </div>
+  <div class="card overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="border-b border-white/[0.06]">
+          {% for col in ['ID', 'Site', 'Owner', 'Status', 'Storage', 'Deployed', 'Actions'] %}
+          <th class="px-5 py-3 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">{{ col }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-white/[0.04]">
+        {% for s in sites %}
+        <tr class="hover:bg-white/[0.02]">
+          <td class="px-5 py-3 text-zinc-600 font-mono text-xs">{{ s.id }}</td>
+          <td class="px-5 py-3">
+            <p class="text-zinc-200 font-medium">{{ s.name }}</p>
+            <p class="text-zinc-600 text-xs font-mono">{{ s.subdomain }}</p>
+          </td>
+          <td class="px-5 py-3 text-xs text-zinc-400">{{ s.email }}</td>
+          <td class="px-5 py-3">
+            <span class="badge {{ 'badge-green' if s.status == 'active' else 'badge-gray' }} text-[11px]">
+              {{ s.status }}
+            </span>
+          </td>
+          <td class="px-5 py-3 text-xs text-zinc-400">{{ s.storage_used_mb | round(1) }} MB</td>
+          <td class="px-5 py-3 text-xs text-zinc-500">{{ s.deployed_at[:10] if s.deployed_at else '—' }}</td>
+          <td class="px-5 py-3">
+            <div class="flex items-center gap-1">
+              <a href="{{ url_for('sites.manage', site_id=s.id) }}"
+                 class="w-7 h-7 rounded-lg bg-white/[0.05] hover:bg-brand-500/20 flex items-center justify-center text-zinc-500 hover:text-brand-400 transition-colors">
+                <i class="fas fa-external-link text-xs"></i>
+              </a>
+              <form method="POST" action="{{ url_for('sites.toggle_status', site_id=s.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <button type="submit"
+                        class="w-7 h-7 rounded-lg bg-white/[0.05] hover:bg-yellow-500/10 flex items-center justify-center text-zinc-500 hover:text-yellow-400 transition-colors"
+                        title="{{ 'Suspend' if s.status == 'active' else 'Activate' }}">
+                  <i class="fas fa-{{ 'pause' if s.status == 'active' else 'play' }} text-xs"></i>
+                </button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="px-5 py-10 text-center text-zinc-600 text-sm">No sites yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if pages > 1 %}
+  <div class="flex items-center justify-center gap-2">
+    {% for p in range(1, pages + 1) %}
+    <a href="{{ url_for('admin.sites', page=p) }}"
+       class="w-8 h-8 rounded-lg flex items-center justify-center text-xs
+              {{ 'bg-brand-500 text-white' if p == page else 'bg-white/[0.05] text-zinc-400 hover:bg-white/10' }}">{{ p }}</a>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

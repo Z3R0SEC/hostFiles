@@ -1,0 +1,45 @@
+# HostFlow — Git Ignore
+
+# Environment
+.env
+*.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+*.egg-info/
+dist/
+build/
+
+# Flask instance
+instance/
+*.db
+
+# Runtime data
+uploads/
+user_sites/
+backups/
+logs/
+static/uploads/
+
+# Sessions
+flask_session/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node (if any tooling added later)
+node_modules/

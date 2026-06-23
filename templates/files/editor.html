@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+{% block title %}Edit {{ rel_path }} — {{ platform_name }}{% endblock %}
+
+{% block head %}
+<style>
+  html, body { height: 100%; overflow: hidden; }
+  #monaco-container { height: calc(100vh - 56px); }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="flex flex-col h-screen" x-data="monacoEditor()">
+
+  <!-- Editor top bar -->
+  <header class="flex items-center gap-3 px-4 h-14 flex-shrink-0 border-b border-white/[0.06]"
+          style="background:#0f0f1a">
+    <a href="{{ url_for('files.browse', site_id=site.id, rel_path=rel_path.rsplit('/', 1)[0] if '/' in rel_path else '') }}"
+       class="w-8 h-8 rounded-lg flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors flex-shrink-0">
+      <i class="fas fa-arrow-left text-sm"></i>
+    </a>
+
+    <!-- Breadcrumb -->
+    <div class="flex items-center gap-1.5 text-sm text-zinc-500 flex-1 min-w-0">
+      <span class="text-zinc-400 font-medium">{{ site.name }}</span>
+      <i class="fas fa-chevron-right text-xs"></i>
+      <span class="text-zinc-300 font-mono truncate">{{ rel_path }}</span>
+    </div>
+
+    <!-- Language badge -->
+    <span class="badge badge-blue font-mono text-xs">{{ language }}</span>
+
+    <!-- Save status -->
+    <div class="flex items-center gap-1.5 text-xs" :class="saved ? 'text-green-400' : (saving ? 'text-yellow-400' : 'text-zinc-500')">
+      <i :class="saved ? 'fas fa-check-circle' : (saving ? 'fas fa-spinner fa-spin' : 'fas fa-circle')"></i>
+      <span x-text="saved ? 'Saved' : (saving ? 'Saving…' : 'Unsaved changes')"></span>
+    </div>
+
+    <!-- Actions -->
+    <div class="flex items-center gap-2">
+      <button @click="saveFile()" :disabled="saving"
+              class="btn btn-primary text-xs px-3 py-1.5 h-8 disabled:opacity-50">
+        <i class="fas fa-save"></i> Save
+        <span class="text-white/50 ml-1 hidden sm:inline">Ctrl+S</span>
+      </button>
+      <button @click="toggleFullscreen()"
+              class="w-8 h-8 rounded-lg flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/[0.06] transition-colors">
+        <i :class="fullscreen ? 'fas fa-compress' : 'fas fa-expand'" class="text-sm"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- Monaco -->
+  <div id="monaco-container"></div>
+
+</div>
+
+{% block scripts %}
+<!-- Monaco loader -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/loader.min.js"></script>
+<script>
+const FILE_CONTENT = {{ content | tojson }};
+const FILE_PATH = {{ rel_path | tojson }};
+const LANGUAGE = {{ language | tojson }};
+const SITE_ID = {{ site.id }};
+const CSRF = {{ csrf_token() | tojson }};
+
+require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs' } });
+
+let editorInstance = null;
+
+require(['vs/editor/editor.main'], function() {
+  monaco.editor.defineTheme('hostflow-dark', {
+    base: 'vs-dark',
+    inherit: true,
+    rules: [
+      { token: '', foreground: 'c9d1d9', background: '0d0d14' },
+      { token: 'keyword', foreground: '818cf8' },
+      { token: 'string', foreground: '4ade80' },
+      { token: 'comment', foreground: '4b5563', fontStyle: 'italic' },
+      { token: 'number', foreground: 'f59e0b' },
+    ],
+    colors: {
+      'editor.background': '#0d0d14',
+      'editor.foreground': '#c9d1d9',
+      'editorLineNumber.foreground': '#374151',
+      'editorLineNumber.activeForeground': '#3b82f6',
+      'editor.lineHighlightBackground': '#13131f',
+      'editor.selectionBackground': '#3b82f640',
+      'editorCursor.foreground': '#3b82f6',
+      'editor.findMatchBackground': '#3b82f630',
+      'editor.findMatchHighlightBackground': '#3b82f610',
+    }
+  });
+
+  editorInstance = monaco.editor.create(document.getElementById('monaco-container'), {
+    value: FILE_CONTENT,
+    language: LANGUAGE,
+    theme: 'hostflow-dark',
+    fontSize: 14,
+    lineHeight: 22,
+    fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+    minimap: { enabled: window.innerWidth > 768 },
+    wordWrap: 'on',
+    scrollBeyondLastLine: false,
+    automaticLayout: true,
+    padding: { top: 16 },
+    renderLineHighlight: 'gutter',
+    smoothScrolling: true,
+    cursorSmoothCaretAnimation: 'on',
+    bracketPairColorization: { enabled: true },
+    suggest: { showSnippets: true },
+    formatOnType: true,
+    formatOnPaste: true,
+  });
+
+  // Track changes for auto-save
+  let changeTimer = null;
+  editorInstance.onDidChangeModelContent(() => {
+    window._alpineEditor.saved = false;
+    clearTimeout(changeTimer);
+    changeTimer = setTimeout(() => window._alpineEditor.saveFile(), 3000);
+  });
+
+  // Ctrl+S
+  editorInstance.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
+    window._alpineEditor.saveFile();
+  });
+});
+
+function monacoEditor() {
+  return {
+    saving: false,
+    saved: true,
+    fullscreen: false,
+
+    init() { window._alpineEditor = this; },
+
+    async saveFile() {
+      if (!editorInstance) return;
+      this.saving = true;
+      try {
+        const res = await fetch(`/files/${SITE_ID}/edit/${FILE_PATH}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+          body: JSON.stringify({ content: editorInstance.getValue() })
+        });
+        const data = await res.json();
+        this.saved = data.success;
+        if (!data.success) {
+          window.dispatchEvent(new CustomEvent('toast', { detail: { message: 'Save failed!', icon: 'fas fa-xmark text-red-400' } }));
+        }
+      } catch(e) {
+        this.saved = false;
+      } finally {
+        this.saving = false;
+      }
+    },
+
+    toggleFullscreen() {
+      this.fullscreen = !this.fullscreen;
+      if (this.fullscreen) {
+        document.querySelector('header').style.display = 'none';
+        document.getElementById('monaco-container').style.height = '100vh';
+      } else {
+        document.querySelector('header').style.display = '';
+        document.getElementById('monaco-container').style.height = 'calc(100vh - 56px)';
+      }
+    }
+  }
+}
+</script>
+{% endblock %}
+{% endblock %}

@@ -1,0 +1,328 @@
+{% extends "partials/dash_layout.html" %}
+{% block title %}Files — {{ site.name }} — {{ platform_name }}{% endblock %}
+
+{% block head %}
+<style>
+  .file-row { transition: background .1s; }
+  .file-row:hover { background: rgba(255,255,255,0.03); }
+  .drop-overlay { display:none; position:fixed; inset:0; z-index:100;
+    background:rgba(37,99,235,0.12); border:3px dashed #3b82f6;
+    align-items:center; justify-content:center; flex-direction:column; gap:1rem; }
+  body.dragging-over .drop-overlay { display:flex; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto space-y-5 animate-fade-in" x-data="fileManager()">
+
+  <!-- Drag overlay -->
+  <div class="drop-overlay" id="drop-overlay">
+    <i class="fas fa-cloud-arrow-up text-brand-400 text-5xl"></i>
+    <p class="text-white text-xl font-bold">Drop files to upload</p>
+  </div>
+
+  <!-- Header -->
+  <div class="flex flex-wrap items-center gap-3 justify-between">
+    <div>
+      <div class="flex items-center gap-2 text-sm text-zinc-500 mb-1">
+        <a href="{{ url_for('sites.manage', site_id=site.id) }}" class="hover:text-zinc-300">{{ site.name }}</a>
+        <i class="fas fa-chevron-right text-xs"></i>
+        <span class="text-zinc-300">Files</span>
+        {% if rel_path %}
+          {% for part in rel_path.split('/') %}
+            <i class="fas fa-chevron-right text-xs"></i>
+            <span class="text-zinc-300">{{ part }}</span>
+          {% endfor %}
+        {% endif %}
+      </div>
+      <h1 class="text-xl font-bold text-white">File Manager</h1>
+    </div>
+
+    <div class="flex items-center gap-2 flex-wrap">
+      <!-- Search -->
+      <form class="relative">
+        <input type="search" name="q" value="{{ query }}" placeholder="Search files…"
+               class="input-field pl-9 pr-3 py-2 text-sm w-48"/>
+        <i class="fas fa-search absolute left-3 top-2.5 text-zinc-500 text-xs"></i>
+      </form>
+
+      <button @click="showNewFolder=true"
+              class="btn btn-secondary text-sm"><i class="fas fa-folder-plus"></i> New Folder</button>
+      <button @click="$refs.uploadInput.click()"
+              class="btn btn-primary text-sm"><i class="fas fa-upload"></i> Upload</button>
+      <input type="file" multiple x-ref="uploadInput" class="hidden"
+             @change="uploadFiles($event.target.files)"/>
+    </div>
+  </div>
+
+  <!-- Upload progress -->
+  <div x-show="uploading" class="card p-4">
+    <div class="flex items-center justify-between text-sm mb-2">
+      <span class="text-zinc-300">Uploading <span x-text="uploadCount"></span> file(s)…</span>
+      <span class="text-brand-400" x-text="uploadPct + '%'"></span>
+    </div>
+    <div class="h-1.5 rounded-full bg-white/5">
+      <div class="h-1.5 rounded-full bg-brand-500 transition-all" :style="'width:'+uploadPct+'%'"></div>
+    </div>
+  </div>
+
+  <!-- New folder modal -->
+  <div x-show="showNewFolder" x-transition class="fixed inset-0 z-50 flex items-center justify-center p-4"
+       @click.self="showNewFolder=false">
+    <div class="absolute inset-0 bg-black/60" @click="showNewFolder=false"></div>
+    <div class="card p-6 w-full max-w-sm relative z-10">
+      <h3 class="font-semibold text-white mb-4">New Folder</h3>
+      <input x-model="newFolderName" type="text" placeholder="folder-name"
+             class="input-field mb-4" @keydown.enter="createFolder()" autofocus/>
+      <div class="flex gap-2">
+        <button @click="createFolder()" class="btn btn-primary flex-1 justify-center">Create</button>
+        <button @click="showNewFolder=false" class="btn btn-secondary flex-1 justify-center">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rename modal -->
+  <div x-show="renamingEntry" x-transition class="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div class="absolute inset-0 bg-black/60" @click="renamingEntry=null"></div>
+    <div class="card p-6 w-full max-w-sm relative z-10">
+      <h3 class="font-semibold text-white mb-4">Rename</h3>
+      <input x-model="renameNewName" type="text" class="input-field mb-4"
+             @keydown.enter="submitRename()"/>
+      <div class="flex gap-2">
+        <button @click="submitRename()" class="btn btn-primary flex-1 justify-center">Rename</button>
+        <button @click="renamingEntry=null" class="btn btn-secondary flex-1 justify-center">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Search results -->
+  {% if search_results is not none %}
+    <div class="card">
+      <div class="px-5 py-4 border-b border-white/[0.06]">
+        <p class="text-sm text-zinc-400">{{ search_results | length }} result(s) for <span class="text-white">"{{ query }}"</span></p>
+      </div>
+      {% if search_results %}
+      <div class="divide-y divide-white/[0.04]">
+        {% for f in search_results %}
+        <div class="file-row flex items-center gap-3 px-5 py-3">
+          <i class="fas fa-file{% if f.editable %}-code{% elif f.is_image %}-image{% endif %} text-zinc-500 w-4 text-center text-sm flex-shrink-0"></i>
+          <div class="flex-1 min-w-0">
+            <p class="text-sm text-zinc-200 truncate">{{ f.rel }}</p>
+            <p class="text-xs text-zinc-600">{{ f.size_human }}</p>
+          </div>
+          {% if f.editable %}
+          <a href="{{ url_for('files.edit', site_id=site.id, rel_path=f.rel) }}"
+             class="btn btn-secondary text-xs py-1 px-2">Edit</a>
+          {% endif %}
+          <a href="{{ url_for('files.download', site_id=site.id, rel_path=f.rel) }}"
+             class="btn btn-secondary text-xs py-1 px-2"><i class="fas fa-download"></i></a>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+        <div class="p-10 text-center text-zinc-600 text-sm">No files found.</div>
+      {% endif %}
+    </div>
+
+  {% else %}
+    <!-- Directory listing -->
+    <div class="card">
+      <!-- Breadcrumb back -->
+      {% if entries and entries.parent is not none %}
+      <div class="px-5 py-3 border-b border-white/[0.06]">
+        <a href="{{ url_for('files.browse', site_id=site.id, rel_path=entries.parent) }}"
+           class="flex items-center gap-2 text-sm text-zinc-400 hover:text-zinc-200">
+          <i class="fas fa-arrow-left text-xs"></i> Up one level
+        </a>
+      </div>
+      {% endif %}
+
+      {% if entries and (entries.folders or entries.files) %}
+        <!-- Folders -->
+        {% for folder in entries.folders %}
+        <div class="file-row flex items-center gap-3 px-5 py-3 border-b border-white/[0.03]">
+          <i class="fas fa-folder text-amber-400 w-4 text-center flex-shrink-0"></i>
+          <a href="{{ url_for('files.browse', site_id=site.id, rel_path=folder.rel) }}"
+             class="flex-1 text-sm text-zinc-200 hover:text-white font-medium truncate">
+            {{ folder.name }}
+          </a>
+          <div class="flex items-center gap-1">
+            <a href="{{ url_for('files.download_zip', site_id=site.id) }}?path={{ folder.rel }}"
+               class="w-7 h-7 rounded-lg bg-white/[0.04] hover:bg-white/10 flex items-center justify-center text-zinc-500 hover:text-zinc-300 transition-colors">
+              <i class="fas fa-file-zipper text-xs"></i>
+            </a>
+            <button @click="startRename('{{ folder.rel }}', '{{ folder.name }}')"
+                    class="w-7 h-7 rounded-lg bg-white/[0.04] hover:bg-white/10 flex items-center justify-center text-zinc-500 hover:text-zinc-300 transition-colors">
+              <i class="fas fa-pen text-xs"></i>
+            </button>
+            <button @click="deleteEntry('{{ folder.rel }}', '{{ folder.name }}')"
+                    class="w-7 h-7 rounded-lg bg-white/[0.04] hover:bg-red-500/10 flex items-center justify-center text-zinc-500 hover:text-red-400 transition-colors">
+              <i class="fas fa-trash text-xs"></i>
+            </button>
+          </div>
+        </div>
+        {% endfor %}
+
+        <!-- Files -->
+        {% for file in entries.files %}
+        <div class="file-row flex items-center gap-3 px-5 py-3 border-b border-white/[0.03]">
+          <i class="fas fa-
+            {% if file.ext in ('php',) %}php
+            {% elif file.ext in ('html','htm') %}html5
+            {% elif file.ext in ('css',) %}css3
+            {% elif file.ext in ('js',) %}js
+            {% elif file.ext in ('json',) %}file-code
+            {% elif file.ext in ('png','jpg','jpeg','gif','webp','svg','ico') %}image
+            {% elif file.ext in ('pdf',) %}file-pdf
+            {% elif file.ext in ('zip',) %}file-zipper
+            {% else %}file{% endif %}
+            text-{% if file.ext in ('php',) %}blue-400{% elif file.ext in ('css',) %}cyan-400{% elif file.ext in ('js',) %}yellow-400{% elif file.is_image %}pink-400{% else %}slate-500{% endif %}
+            w-4 text-center flex-shrink-0 text-sm"></i>
+          <div class="flex-1 min-w-0">
+            <p class="text-sm text-zinc-200 truncate">{{ file.name }}</p>
+            <p class="text-xs text-zinc-600">{{ file.size_human }}</p>
+          </div>
+          <div class="flex items-center gap-1">
+            {% if file.editable %}
+            <a href="{{ url_for('files.edit', site_id=site.id, rel_path=file.rel) }}"
+               class="btn btn-secondary text-xs py-1 px-2.5 h-7">
+              <i class="fas fa-pen text-xs"></i> Edit
+            </a>
+            {% endif %}
+            <a href="{{ url_for('files.download', site_id=site.id, rel_path=file.rel) }}"
+               class="w-7 h-7 rounded-lg bg-white/[0.04] hover:bg-white/10 flex items-center justify-center text-zinc-500 hover:text-zinc-300 transition-colors">
+              <i class="fas fa-download text-xs"></i>
+            </a>
+            <button @click="startRename('{{ file.rel }}', '{{ file.name }}')"
+                    class="w-7 h-7 rounded-lg bg-white/[0.04] hover:bg-white/10 flex items-center justify-center text-zinc-500 hover:text-zinc-300 transition-colors">
+              <i class="fas fa-pen text-xs"></i>
+            </button>
+            <button @click="deleteEntry('{{ file.rel }}', '{{ file.name }}')"
+                    class="w-7 h-7 rounded-lg bg-white/[0.04] hover:bg-red-500/10 flex items-center justify-center text-zinc-500 hover:text-red-400 transition-colors">
+              <i class="fas fa-trash text-xs"></i>
+            </button>
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="p-12 text-center">
+          <i class="fas fa-folder-open text-zinc-700 text-4xl mb-3"></i>
+          <p class="text-zinc-500 text-sm">This directory is empty.</p>
+          <button @click="$refs.uploadInput.click()" class="btn btn-secondary text-sm mt-4">
+            <i class="fas fa-upload"></i> Upload Files
+          </button>
+        </div>
+      {% endif %}
+    </div>
+
+    <!-- Storage bar -->
+    <div class="flex items-center justify-between text-xs text-zinc-600">
+      <span>Storage: {{ storage_mb | round(2) }} MB used</span>
+      <a href="{{ url_for('files.download_zip', site_id=site.id) }}"
+         class="text-brand-400 hover:text-brand-300 flex items-center gap-1">
+        <i class="fas fa-file-zipper"></i> Download all as ZIP
+      </a>
+    </div>
+  {% endif %}
+
+</div>
+
+{% block scripts %}
+<script>
+const SITE_ID = {{ site.id }};
+const CURRENT_DIR = '{{ rel_path }}';
+
+function fileManager() {
+  return {
+    uploading: false, uploadPct: 0, uploadCount: 0,
+    showNewFolder: false, newFolderName: '',
+    renamingEntry: null, renameNewName: '',
+
+    async uploadFiles(files) {
+      if (!files.length) return;
+      this.uploading = true;
+      this.uploadCount = files.length;
+      this.uploadPct = 0;
+
+      const fd = new FormData();
+      for (const f of files) fd.append('files', f);
+      fd.append('rel_dir', CURRENT_DIR);
+      fd.append('csrf_token', document.querySelector('meta[name="csrf_token"]')?.content || '');
+
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', `/files/${SITE_ID}/upload`);
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) this.uploadPct = Math.round((e.loaded / e.total) * 100);
+      };
+      xhr.onload = () => {
+        this.uploading = false;
+        const res = JSON.parse(xhr.responseText);
+        if (res.success) {
+          window.dispatchEvent(new CustomEvent('toast', { detail: { message: `${res.saved} file(s) uploaded!`, icon: 'fas fa-check text-green-400' } }));
+          setTimeout(() => location.reload(), 800);
+        }
+      };
+      xhr.send(fd);
+    },
+
+    async createFolder() {
+      const name = this.newFolderName.trim();
+      if (!name) return;
+      const path = CURRENT_DIR ? `${CURRENT_DIR}/${name}` : name;
+      const res = await fetch(`/files/${SITE_ID}/mkdir`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+        body: JSON.stringify({ path })
+      });
+      if ((await res.json()).success) {
+        this.showNewFolder = false;
+        this.newFolderName = '';
+        location.reload();
+      }
+    },
+
+    startRename(rel, name) {
+      this.renamingEntry = rel;
+      this.renameNewName = name;
+    },
+
+    async submitRename() {
+      const res = await fetch(`/files/${SITE_ID}/rename`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+        body: JSON.stringify({ old: this.renamingEntry, new: this.renameNewName })
+      });
+      if ((await res.json()).success) { this.renamingEntry = null; location.reload(); }
+    },
+
+    async deleteEntry(rel, name) {
+      if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
+      const res = await fetch(`/files/${SITE_ID}/delete-file`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+        body: JSON.stringify({ path: rel })
+      });
+      if ((await res.json()).success) location.reload();
+    }
+  }
+}
+
+function getCsrf() {
+  return document.querySelector('[name=csrf_token]')?.value || '';
+}
+
+// Global drag-and-drop
+document.addEventListener('dragover', (e) => { e.preventDefault(); document.body.classList.add('dragging-over'); });
+document.addEventListener('dragleave', (e) => { if (!e.relatedTarget) document.body.classList.remove('dragging-over'); });
+document.addEventListener('drop', (e) => {
+  e.preventDefault();
+  document.body.classList.remove('dragging-over');
+  // Trigger Alpine upload
+  const comp = window._alpineFileManager;
+  if (comp && e.dataTransfer.files.length) comp.uploadFiles(e.dataTransfer.files);
+});
+</script>
+<!-- Hidden CSRF for JS -->
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+{% endblock %}
+{% endblock %}

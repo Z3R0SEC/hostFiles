@@ -1,0 +1,187 @@
+{% extends "partials/dash_layout.html" %}
+{% block title %}Overview — {{ platform_name }}{% endblock %}
+
+{% block content %}
+{% set _h = request.host %}
+{% set _bare = _h.split(':')[0] %}
+{% set _is_local = _bare in ('localhost','127.0.0.1','0.0.0.0') %}
+{% macro site_url(sub) %}{{ request.scheme }}://{% if _is_local %}{{ _h }}/preview/{{ sub }}{% else %}{{ sub }}.{{ _bare }}{% endif %}{% endmacro %}
+<div class="space-y-6 animate-fade-in">
+
+  <!-- Header -->
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-xl font-bold text-white">Overview</h1>
+      <p class="text-zinc-500 text-sm mt-0.5">Welcome back, {{ current_user.username }}.</p>
+    </div>
+    {% if not site %}
+      <a href="{{ url_for('sites.create') }}" class="btn btn-primary">
+        <i class="fas fa-plus text-xs"></i> New Site
+      </a>
+    {% endif %}
+  </div>
+
+  <!-- Announcements -->
+  {% for ann in announcements %}
+    <div class="flex items-start gap-3 px-4 py-3 rounded-xl border
+      {% if ann.type == 'success' %}bg-green-500/5 border-green-500/15 text-green-300
+      {% elif ann.type == 'warning' %}bg-yellow-500/5 border-yellow-500/15 text-yellow-300
+      {% elif ann.type == 'error' %}bg-red-500/5 border-red-500/15 text-red-300
+      {% else %}bg-brand-500/5 border-brand-500/15 text-brand-300{% endif %}">
+      <i class="fas fa-{% if ann.type=='success' %}circle-check{% elif ann.type=='warning' %}triangle-exclamation{% elif ann.type=='error' %}circle-xmark{% else %}megaphone{% endif %} mt-0.5 flex-shrink-0"></i>
+      <div>
+        <p class="font-semibold text-sm">{{ ann.title }}</p>
+        <p class="text-xs opacity-75 mt-0.5">{{ ann.message }}</p>
+      </div>
+    </div>
+  {% endfor %}
+
+  <!-- Stats row -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <!-- Site -->
+    <div class="card p-4">
+      <p class="text-[11px] font-semibold uppercase tracking-widest text-zinc-600 mb-3">Site</p>
+      {% if site %}
+        <p class="text-base font-bold text-white truncate mb-1.5">{{ site.name }}</p>
+        <div class="flex items-center gap-1.5">
+          <span class="status-dot {{ 'online' if site.status == 'active' else 'offline' }}"></span>
+          <span class="text-xs text-zinc-400 font-medium">{{ site.status.title() }}</span>
+        </div>
+      {% else %}
+        <p class="text-base font-bold text-zinc-600">No site</p>
+        <p class="text-xs text-zinc-700 mt-1">Deploy your first site</p>
+      {% endif %}
+    </div>
+
+    <!-- Database -->
+    <div class="card p-4">
+      <p class="text-[11px] font-semibold uppercase tracking-widest text-zinc-600 mb-3">Database</p>
+      {% if site %}
+        <p class="text-base font-bold text-white mb-1.5">MariaDB</p>
+        <div class="flex items-center gap-1.5">
+          <span class="status-dot online"></span>
+          <span class="text-xs text-zinc-400 font-medium">Active</span>
+        </div>
+      {% else %}
+        <p class="text-base font-bold text-zinc-600">—</p>
+        <p class="text-xs text-zinc-700 mt-1">Provisioned on deploy</p>
+      {% endif %}
+    </div>
+
+    <!-- Storage -->
+    <div class="card p-4">
+      <p class="text-[11px] font-semibold uppercase tracking-widest text-zinc-600 mb-3">Storage</p>
+      {% if site %}
+        <p class="text-base font-bold text-white mb-2">{{ site.storage_used_mb | round(1) }} MB</p>
+        <div class="h-1 rounded-full bg-white/5 overflow-hidden">
+          <div class="h-1 rounded-full {{ 'bg-green-500' if storage_pct < 70 else ('bg-yellow-500' if storage_pct < 90 else 'bg-red-500') }}"
+               style="width:{{ [storage_pct, 100] | min }}%"></div>
+        </div>
+        <p class="text-[11px] text-zinc-600 mt-1.5">of {{ current_user.storage_limit_mb }} MB</p>
+      {% else %}
+        <p class="text-base font-bold text-zinc-600">—</p>
+      {% endif %}
+    </div>
+
+    <!-- Notifications -->
+    <div class="card p-4">
+      <p class="text-[11px] font-semibold uppercase tracking-widest text-zinc-600 mb-3">Alerts</p>
+      <p class="text-2xl font-bold text-white mb-1">{{ unread }}</p>
+      <p class="text-xs text-zinc-600">unread</p>
+    </div>
+  </div>
+
+  <!-- Main grid -->
+  <div class="grid lg:grid-cols-3 gap-5">
+
+    <!-- Site card -->
+    <div class="lg:col-span-2">
+      {% if site %}
+        <div class="card p-5">
+          <div class="flex items-start justify-between mb-4">
+            <div>
+              <h2 class="font-bold text-white text-base">{{ site.name }}</h2>
+              <a href="{{ site_url(site.subdomain) }}"
+                 target="_blank"
+                 class="text-xs text-brand-400 hover:text-brand-300 flex items-center gap-1 mt-1">
+                {{ site_url(site.subdomain) }}
+                <i class="fas fa-arrow-up-right-from-square text-[10px]"></i>
+              </a>
+            </div>
+            <span class="badge {{ 'badge-green' if site.status == 'active' else 'badge-gray' }}">
+              {{ site.status.title() }}
+            </span>
+          </div>
+
+          <!-- Quick actions -->
+          <div class="grid grid-cols-3 gap-2 mb-4">
+            <a href="{{ url_for('sites.deploy', site_id=site.id) }}"
+               class="flex flex-col items-center gap-2 py-3 rounded-lg hover:bg-white/5 border border-white/7 transition-colors text-center">
+              <i class="fas fa-rocket text-brand-400 text-sm"></i>
+              <span class="text-[11px] text-zinc-500 font-medium">Redeploy</span>
+            </a>
+            <a href="{{ url_for('files.browse', site_id=site.id) }}"
+               class="flex flex-col items-center gap-2 py-3 rounded-lg hover:bg-white/5 border border-white/7 transition-colors text-center">
+              <i class="fas fa-folder-open text-amber-400 text-sm"></i>
+              <span class="text-[11px] text-zinc-500 font-medium">Files</span>
+            </a>
+            <a href="{{ url_for('backups.list_backups', site_id=site.id) }}"
+               class="flex flex-col items-center gap-2 py-3 rounded-lg hover:bg-white/5 border border-white/7 transition-colors text-center">
+              <i class="fas fa-cloud-arrow-up text-cyan-400 text-sm"></i>
+              <span class="text-[11px] text-zinc-500 font-medium">Backup</span>
+            </a>
+          </div>
+
+          <div class="flex gap-2">
+            <a href="{{ url_for('sites.manage', site_id=site.id) }}" class="btn btn-secondary flex-1 justify-center">
+              <i class="fas fa-gear text-xs"></i> Manage
+            </a>
+            <a href="{{ url_for('databases.info', site_id=site.id) }}" class="btn btn-secondary flex-1 justify-center">
+              <i class="fas fa-database text-xs"></i> Database
+            </a>
+          </div>
+        </div>
+      {% else %}
+        <div class="card p-8 text-center">
+          <div class="w-12 h-12 rounded-xl bg-brand-600/10 border border-brand-600/20 flex items-center justify-center mx-auto mb-4">
+            <i class="fas fa-server text-brand-400 text-lg"></i>
+          </div>
+          <h2 class="text-base font-bold text-white mb-1.5">No website yet</h2>
+          <p class="text-zinc-500 text-sm mb-5 max-w-xs mx-auto leading-relaxed">
+            Upload a ZIP file and your site goes live in seconds. PHP and HTML supported.
+          </p>
+          <a href="{{ url_for('sites.create') }}" class="btn btn-primary mx-auto">
+            <i class="fas fa-plus text-xs"></i> Create Website
+          </a>
+        </div>
+      {% endif %}
+    </div>
+
+    <!-- Activity -->
+    <div class="card">
+      <div class="px-4 py-3 flex items-center justify-between" style="border-bottom:1px solid rgba(255,255,255,0.07)">
+        <h3 class="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Activity</h3>
+      </div>
+      <div class="divide-y divide-white/[0.04]">
+        {% if activity %}
+          {% for act in activity %}
+            <div class="px-4 py-3 flex items-start gap-3">
+              <div class="w-6 h-6 rounded-md bg-white/[0.04] flex items-center justify-center flex-shrink-0 mt-0.5">
+                <i class="fas fa-{% if 'deploy' in act.action %}rocket{% elif 'login' in act.action %}arrow-right-to-bracket{% elif 'delete' in act.action %}trash{% elif 'upload' in act.action %}upload{% elif 'edit' in act.action %}pen{% else %}circle{% endif %} text-zinc-500 text-[10px]"></i>
+              </div>
+              <div class="min-w-0 flex-1">
+                <p class="text-xs text-zinc-300 font-medium truncate">{{ act.action.replace('_',' ').title() }}</p>
+                <p class="text-[11px] text-zinc-600 mt-0.5">{{ act.created_at[:16] }}</p>
+              </div>
+            </div>
+          {% endfor %}
+        {% else %}
+          <div class="px-4 py-8 text-center text-zinc-700 text-xs">No activity yet.</div>
+        {% endif %}
+      </div>
+    </div>
+
+  </div>
+
+</div>
+{% endblock %}

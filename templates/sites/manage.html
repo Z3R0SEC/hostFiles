@@ -1,0 +1,178 @@
+{% extends "partials/dash_layout.html" %}
+{% block title %}{{ site.name }} — {{ platform_name }}{% endblock %}
+
+{% block content %}
+<div class="space-y-5 animate-fade-in">
+
+  <!-- Header -->
+  <div class="flex flex-wrap items-start gap-3 justify-between">
+    <div>
+      <div class="flex items-center gap-2.5 mb-1">
+        <h1 class="text-xl font-bold text-white">{{ site.name }}</h1>
+        <span class="badge {{ 'badge-green' if site.status == 'active' else 'badge-gray' }}">
+          {{ site.status.title() }}
+        </span>
+      </div>
+      <a href="{{ site_url }}" target="_blank"
+         class="text-xs text-brand-400 hover:text-brand-300 flex items-center gap-1.5 transition-colors">
+        {{ site_url }} <i class="fas fa-arrow-up-right-from-square text-[10px]"></i>
+      </a>
+    </div>
+    <div class="flex gap-2 flex-wrap">
+      <a href="{{ url_for('sites.deploy', site_id=site.id) }}" class="btn btn-primary">
+        <i class="fas fa-rocket text-xs"></i> Redeploy
+      </a>
+      <form method="POST" action="{{ url_for('backups.create', site_id=site.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <button type="submit" class="btn btn-secondary">
+          <i class="fas fa-cloud-arrow-up text-xs"></i> Backup
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Info + actions grid -->
+  <div class="grid lg:grid-cols-3 gap-4">
+    <!-- Site details -->
+    <div class="lg:col-span-2 card p-5">
+      <p class="text-[11px] font-semibold text-zinc-600 uppercase tracking-widest mb-4">Site Details</p>
+      <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+        {% for label, val in [
+          ('Subdomain', site.subdomain),
+          ('Entry File', site.entry_file or 'Not deployed'),
+          ('Storage', (site.storage_used_mb | round(2)) ~ ' MB'),
+          ('Created', site.created_at[:10]),
+          ('Last Deploy', site.deployed_at[:10] if site.deployed_at else 'Never'),
+        ] %}
+        <div>
+          <p class="text-[11px] text-zinc-700 mb-0.5">{{ label }}</p>
+          <p class="text-sm text-zinc-300 font-mono">{{ val }}</p>
+        </div>
+        {% endfor %}
+        <div>
+          <p class="text-[11px] text-zinc-700 mb-0.5">PHP</p>
+          <span class="badge {{ 'badge-blue' if site.php_enabled else 'badge-gray' }}">
+            {{ 'Enabled' if site.php_enabled else 'Disabled' }}
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick actions -->
+    <div class="card p-5">
+      <p class="text-[11px] font-semibold text-zinc-600 uppercase tracking-widest mb-3">Quick Actions</p>
+      <div class="space-y-1.5">
+        {% for href, icon, color, label in [
+          (url_for('files.browse', site_id=site.id), 'fas fa-folder-open', 'text-amber-400', 'File Manager'),
+          (url_for('databases.info', site_id=site.id), 'fas fa-database', 'text-purple-400', 'Database Info'),
+          (url_for('backups.list_backups', site_id=site.id), 'fas fa-cloud-arrow-up', 'text-cyan-400', 'Backups'),
+          (url_for('sites.view_logs', site_id=site.id), 'fas fa-terminal', 'text-green-400', 'Deploy Logs'),
+        ] %}
+        <a href="{{ href }}"
+           class="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-white/3 hover:bg-white/6 border border-white/6 transition-colors">
+          <i class="{{ icon }} {{ color }} w-4 text-center text-sm"></i>
+          <span class="text-sm text-zinc-400">{{ label }}</span>
+          <i class="fas fa-chevron-right text-zinc-700 ml-auto text-xs"></i>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- DB credentials -->
+  {% if db_info %}
+  <div class="card p-5">
+    <div class="flex items-center justify-between mb-4">
+      <p class="text-[11px] font-semibold text-zinc-600 uppercase tracking-widest">Database Credentials</p>
+      <span class="badge {{ 'badge-green' if db_info.status == 'active' else 'badge-red' }}">
+        {{ db_info.status.title() }}
+      </span>
+    </div>
+    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      {% for label, val in [
+        ('Host', db_info.db_host),
+        ('Database', db_info.db_name),
+        ('Username', db_info.db_user),
+        ('Password', db_info.db_password),
+        ('Port', db_info.db_port | string),
+      ] %}
+      <div class="flex items-center justify-between p-3 rounded-lg bg-white/3 border border-white/6">
+        <div class="min-w-0 flex-1">
+          <p class="text-[11px] text-zinc-700 mb-0.5">{{ label }}</p>
+          <p class="text-xs font-mono text-zinc-300 truncate {% if label == 'Password' %}blur-sm hover:blur-none transition-all cursor-pointer{% endif %}">
+            {{ val }}
+          </p>
+        </div>
+        <button onclick="copyToClipboard('{{ val }}')"
+                class="w-7 h-7 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-zinc-600 hover:text-zinc-300 transition-colors ml-2 flex-shrink-0">
+          <i class="fas fa-copy text-xs"></i>
+        </button>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Deployment history -->
+  {% if deps %}
+  <div class="card">
+    <div class="px-5 py-3.5" style="border-bottom:1px solid rgba(255,255,255,0.07)">
+      <p class="text-[11px] font-semibold text-zinc-600 uppercase tracking-widest">Recent Deployments</p>
+    </div>
+    <div class="divide-y divide-white/[0.04]">
+      {% for dep in deps %}
+      <div class="px-5 py-3.5 flex items-center gap-3">
+        <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0
+          {{ 'bg-green-500/8' if dep.status == 'success' else ('bg-red-500/8' if dep.status == 'failed' else 'bg-brand-600/10') }}">
+          <i class="fas fa-{% if dep.status == 'success' %}check{% elif dep.status == 'failed' %}xmark{% else %}circle-notch fa-spin{% endif %}
+            text-xs {{ 'text-green-400' if dep.status == 'success' else ('text-red-400' if dep.status == 'failed' else 'text-brand-400') }}"></i>
+        </div>
+        <div class="flex-1 min-w-0">
+          <p class="text-sm text-zinc-300 font-medium truncate">{{ dep.zip_filename or 'Unknown' }}</p>
+          <p class="text-[11px] text-zinc-600 mt-0.5">{{ dep.started_at[:16] }}</p>
+        </div>
+        <span class="badge {{ 'badge-green' if dep.status == 'success' else ('badge-red' if dep.status == 'failed' else 'badge-blue') }}">
+          {{ dep.status.title() }}
+        </span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Danger zone -->
+  <div class="card p-5" style="border-color:rgba(239,68,68,0.12)">
+    <p class="text-[11px] font-semibold text-red-500/70 uppercase tracking-widest mb-4">Danger Zone</p>
+    <div class="flex items-center justify-between">
+      <div>
+        <p class="text-sm text-zinc-300 font-medium">Delete Website</p>
+        <p class="text-xs text-zinc-600 mt-0.5">Permanently removes all files, database, and backups. Cannot be undone.</p>
+      </div>
+      <button onclick="confirmDelete()" class="btn btn-danger ml-4 flex-shrink-0">
+        <i class="fas fa-trash text-xs"></i> Delete
+      </button>
+    </div>
+    <form id="delete-form" method="POST" action="{{ url_for('sites.delete', site_id=site.id) }}" class="hidden">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+    </form>
+  </div>
+
+</div>
+
+{% block scripts %}
+<script>
+function copyToClipboard(text) {
+  navigator.clipboard.writeText(text).then(() => {
+    window.dispatchEvent(new CustomEvent('toast', {
+      detail: { message: 'Copied to clipboard', icon: 'fas fa-check text-green-400' }
+    }));
+  });
+}
+function confirmDelete() {
+  if (confirm('Delete "{{ site.name }}"? This permanently removes all files and cannot be undone.')) {
+    document.getElementById('delete-form').submit();
+  }
+}
+</script>
+{% endblock %}
+{% endblock %}

@@ -1,0 +1,146 @@
+{% extends "admin/admin_layout.html" %}
+{% block title %}Admin — {{ platform_name }}{% endblock %}
+
+{% block admin_content %}
+<div class="max-w-6xl mx-auto space-y-6 animate-fade-in">
+
+  <div>
+    <h1 class="text-2xl font-bold text-white">Control Center</h1>
+    <p class="text-zinc-400 text-sm mt-1">Platform overview and health status.</p>
+  </div>
+
+  <!-- Stats grid -->
+  <div class="grid grid-cols-2 lg:grid-cols-5 gap-4">
+    {% set stat_items = [
+      ('Total Users', stats.total_users, 'fas fa-users', 'bg-brand-500/10', 'text-brand-400'),
+      ('Active Sites', stats.active_sites, 'fas fa-globe', 'bg-green-500/10', 'text-green-400'),
+      ('All Sites', stats.total_sites, 'fas fa-server', 'bg-cyan-500/10', 'text-cyan-400'),
+      ('Databases', stats.total_databases, 'fas fa-database', 'bg-purple-500/10', 'text-purple-400'),
+      ('Backups', stats.total_backups, 'fas fa-cloud', 'bg-amber-500/10', 'text-amber-400'),
+    ] %}
+    {% for label, val, icon, bg, color in stat_items %}
+    <div class="card p-5">
+      <div class="flex items-center justify-between mb-3">
+        <div class="w-8 h-8 rounded-lg {{ bg }} flex items-center justify-center">
+          <i class="{{ icon }} {{ color }} text-sm"></i>
+        </div>
+      </div>
+      <p class="text-2xl font-bold text-white">{{ val }}</p>
+      <p class="text-xs text-zinc-500 mt-0.5">{{ label }}</p>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Disk usage + activity -->
+  <div class="grid lg:grid-cols-3 gap-6">
+
+    <!-- System health -->
+    <div class="card p-6">
+      <h2 class="text-sm font-semibold text-zinc-400 uppercase tracking-widest mb-5">Disk Usage</h2>
+      <div class="space-y-4">
+        <div>
+          <div class="flex items-center justify-between text-xs text-zinc-400 mb-2">
+            <span>Disk</span>
+            <span>{{ disk_used_gb }} / {{ disk_total_gb }} GB ({{ disk_pct }}%)</span>
+          </div>
+          <div class="h-2 rounded-full bg-white/5">
+            <div class="h-2 rounded-full transition-all
+              {{ 'bg-red-500' if disk_pct > 90 else ('bg-yellow-500' if disk_pct > 70 else 'bg-green-500') }}"
+                 style="width:{{ disk_pct }}%"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-6 space-y-3">
+        <div class="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/[0.05]">
+          <div class="flex items-center gap-2">
+            <div class="w-2 h-2 rounded-full bg-green-400"></div>
+            <span class="text-xs text-zinc-400">Platform</span>
+          </div>
+          <span class="text-xs text-zinc-300">Online</span>
+        </div>
+        <div class="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/[0.05]">
+          <div class="flex items-center gap-2">
+            <div class="w-2 h-2 rounded-full bg-green-400"></div>
+            <span class="text-xs text-zinc-400">SQLite DB</span>
+          </div>
+          <span class="text-xs text-zinc-300">OK</span>
+        </div>
+      </div>
+
+      <div class="mt-4 grid grid-cols-2 gap-2">
+        <a href="{{ url_for('admin.monitoring') }}" class="btn btn-secondary text-xs py-2 justify-center">
+          <i class="fas fa-activity"></i> Monitoring
+        </a>
+        <a href="{{ url_for('admin.logs') }}" class="btn btn-secondary text-xs py-2 justify-center">
+          <i class="fas fa-terminal"></i> View Logs
+        </a>
+      </div>
+    </div>
+
+    <!-- Recent activity -->
+    <div class="lg:col-span-2 card">
+      <div class="px-5 py-4 border-b border-white/[0.06] flex items-center justify-between">
+        <h2 class="text-sm font-semibold text-zinc-400 uppercase tracking-widest">Live Activity</h2>
+        <div class="w-2 h-2 rounded-full bg-green-400 animate-pulse-slow"></div>
+      </div>
+      <div class="divide-y divide-white/[0.04] max-h-80 overflow-y-auto" id="activity-feed">
+        {% for act in activity %}
+        <div class="flex items-start gap-3 px-5 py-3">
+          <div class="w-7 h-7 rounded-lg bg-white/[0.04] flex items-center justify-center flex-shrink-0 mt-0.5">
+            <i class="fas fa-{% if 'deploy' in act.action %}rocket text-brand-400{% elif 'login' in act.action %}sign-in-alt text-green-400{% elif 'delete' in act.action %}trash text-red-400{% elif 'admin' in act.action %}shield text-amber-400{% else %}circle text-zinc-600{% endif %} text-xs"></i>
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center justify-between gap-2">
+              <p class="text-xs text-zinc-300 font-medium truncate">{{ act.action.replace('_',' ').title() }}</p>
+              <span class="text-xs text-zinc-600 flex-shrink-0">{{ act.created_at[11:16] }}</span>
+            </div>
+            <p class="text-xs text-zinc-600 truncate">{{ act.email or 'System' }} • {{ act.ip_address or '' }}</p>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick actions -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    {% set actions = [
+      ('Manage Users', 'admin.users', 'fas fa-users', 'text-brand-400'),
+      ('View Sites', 'admin.sites', 'fas fa-globe', 'text-green-400'),
+      ('Databases', 'admin.databases', 'fas fa-database', 'text-purple-400'),
+      ('Settings', 'admin.settings', 'fas fa-cog', 'text-amber-400'),
+    ] %}
+    {% for label, endpoint, icon, color in actions %}
+    <a href="{{ url_for(endpoint) }}"
+       class="card p-5 flex flex-col items-center gap-3 hover:bg-white/[0.03] transition-colors text-center group">
+      <i class="{{ icon }} {{ color }} text-2xl group-hover:scale-110 transition-transform"></i>
+      <span class="text-sm text-zinc-300 font-medium">{{ label }}</span>
+    </a>
+    {% endfor %}
+  </div>
+
+</div>
+
+{% block scripts %}
+<script>
+// Live activity feed via SocketIO
+socket.emit('subscribe_activity');
+socket.on('new_activity', (data) => {
+  const feed = document.getElementById('activity-feed');
+  if (!feed) return;
+  const div = document.createElement('div');
+  div.className = 'flex items-start gap-3 px-5 py-3 border-b border-white/[0.04] animate-slide-in';
+  div.innerHTML = `
+    <div class="w-7 h-7 rounded-lg bg-white/[0.04] flex items-center justify-center flex-shrink-0 mt-0.5">
+      <i class="fas fa-circle text-zinc-600 text-xs"></i>
+    </div>
+    <div class="flex-1 min-w-0">
+      <p class="text-xs text-zinc-300 font-medium">${data.action.replace(/_/g,' ')}</p>
+      <p class="text-xs text-zinc-600">${data.email || 'System'}</p>
+    </div>`;
+  feed.prepend(div);
+});
+</script>
+{% endblock %}
+{% endblock %}
